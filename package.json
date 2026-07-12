@@ -1,0 +1,17 @@
+{
+  "name": "kettu-liquid-glass",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.9.3",
+    "@swc/helpers": "^0.5.15",
+    "@types/react": "^18.3.12",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.2",
+    "vendetta-types": "latest"
+  }
+}
