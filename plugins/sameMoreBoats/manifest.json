@@ -1,0 +1,9 @@
+{
+  "name": "Same More Boats",
+  "description": "Brings PC-only Discord features to mobile: tags, forum channels, advanced server settings, grouped member list, expanded context menus, developer tools and more. Mobile-first parity with desktop.",
+  "authors": [
+    { "name": "you", "id": "0" }
+  ],
+  "main": "src/index.ts",
+  "vendetta": { "icon": "ic_desktop_24px" }
+}
