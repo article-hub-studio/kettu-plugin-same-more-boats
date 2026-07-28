@@ -8,7 +8,7 @@ import {
   findByDisplayNameAll,
   findByStoreName,
 } from "@vendetta/metro";
-import { before, after } from "@vendetta/patcher";
+import { before, after, instead } from "@vendetta/patcher";
 import { copyText } from "./clipboard";
 import { toast } from "./toast";
 
@@ -101,11 +101,13 @@ function safeFind(label: string, fn: () => any): any {
   }
 }
 
-function findNameplate(): any[] {
+function findNameplateComponents(): any[] {
   const results: any[] = [];
   const seen = new Set<any>();
   const add = (x: any) => { if (x && !seen.has(x)) { seen.add(x); results.push(x); } };
-  const names = ["Nameplate", "NameplateInner", "Username", "MessageAuthor", "BotTag", "BotTagRegular", "AuthorTag"];
+
+  const names = ["Nameplate", "NameplateInner", "Username", "MessageAuthor", "BotTag", "BotTagRegular", "AuthorTag", "RoleIcon", "PillWrapper", "ButtonPill"];
+
   for (const n of names) {
     add(safeFind("name:" + n, () => findByName(n, false)));
     const all = safeFind("nameAll:" + n, () => findByNameAll(n, false));
@@ -115,7 +117,22 @@ function findNameplate(): any[] {
     if (Array.isArray(dall)) for (const x of dall) add(x);
     const p = safeFind("props:" + n, () => { const m = findByProps(n); return m ? m[n] : null; });
     add(p);
+
+    const filterFound = safeFind("filter:" + n, () => find((m: any) => {
+      if (typeof m === "function" && (m.displayName === n || m.name === n)) return true;
+      if (m && typeof m === "object") {
+        for (const k of Object.keys(m)) {
+          try {
+            const v = m[k];
+            if (typeof v === "function" && (v.displayName === n || v.name === n)) return true;
+          } catch {}
+        }
+      }
+      return false;
+    }));
+    add(filterFound);
   }
+
   return results;
 }
 
@@ -143,19 +160,22 @@ function injectTagsIntoElement(ret: any, tags: any[]): any {
 function patchComponentRender(comp: any, label: string, handleRet: (args: any[], ret: any) => any): Unpatch | void {
   if (!comp) return;
   const unpatches: Unpatch[] = [];
-  const tryPatch = (key: string): boolean => {
+
+  const tryPatchKey = (parent: any, key: string): boolean => {
     try {
-      const target = (comp as any)[key];
+      const target = parent?.[key];
       if (typeof target !== "function") return false;
-      const un = (after as any)(key, comp, (args: any[], ret: any) => {
+      const un = (after as any)(key, parent, (args: any[], ret: any) => {
         try { return handleRet(args, ret); } catch (e) { log(label, key, "after FAIL", e); return ret; }
       });
       if (typeof un === "function") { unpatches.push(un); log(label, "patched", key); return true; }
     } catch (e) { log(label, key, "patch FAIL", e); }
     return false;
   };
-  let ok = tryPatch("default");
-  if (!ok) ok = tryPatch("type");
+
+  let ok = tryPatchKey(comp, "default");
+  if (!ok) ok = tryPatchKey(comp, "type");
+
   if (!ok && typeof comp === "function") {
     try {
       const un = (after as any)(comp, (args: any[], ret: any) => {
@@ -164,12 +184,31 @@ function patchComponentRender(comp: any, label: string, handleRet: (args: any[],
       if (typeof un === "function") { unpatches.push(un); log(label, "patched self"); ok = true; }
     } catch (e) { log(label, "self patch FAIL", e); }
   }
+
+  if (!ok && comp?.type && typeof comp.type === "function") {
+    try {
+      const un = (after as any)("type", comp, (args: any[], ret: any) => {
+        try { return handleRet(args, ret); } catch (e) { log(label, "type FAIL", e); return ret; }
+      });
+      if (typeof un === "function") { unpatches.push(un); log(label, "patched .type"); ok = true; }
+    } catch (e) { log(label, "type patch FAIL", e); }
+  }
+
+  if (!ok && comp?.render && typeof comp.render === "function") {
+    try {
+      const un = (after as any)("render", comp, (args: any[], ret: any) => {
+        try { return handleRet(args, ret); } catch (e) { log(label, "render FAIL", e); return ret; }
+      });
+      if (typeof un === "function") { unpatches.push(un); log(label, "patched .render"); ok = true; }
+    } catch (e) { log(label, "render patch FAIL", e); }
+  }
+
   if (!ok) { log(label, "no patchable key"); return; }
   return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
 
 function patchMessageAuthor(): Unpatch | void {
-  const comps = findNameplate();
+  const comps = findNameplateComponents();
   if (!comps.length) {
     log("MessageAuthor: no components found");
     return;
@@ -198,34 +237,34 @@ function patchContextMenuItems(): Unpatch | void {
     "buildMessageContextMenuItems", "buildContextMenuItems", "menuItems",
     "getMessageContextMenus", "openContextMenu", "buildMenu", "getMenuItems",
     "ContextMenuContainer", "MenuContainer", "ActionSheetPresenter",
-    "MessageContextMenu", "ContextMenu", "openMenu",
   ];
   let targetMod: any = null;
-  let targetFnName = "";
+  let targetFnName: string | null = null;
 
-  for (const key of finderKeys) {
-    const m = safeFind("ctx:" + key, () => findByProps(key));
-    if (m && typeof m[key] === "function") {
-      targetMod = m;
-      targetFnName = key;
+  for (const k of finderKeys) {
+    const mod = safeFind("ctx:" + k, () => findByProps(k));
+    if (mod && typeof mod[k] === "function") {
+      targetMod = mod;
+      targetFnName = k;
       break;
     }
   }
 
-  if (!targetMod) {
+  if (!targetMod || !targetFnName) {
     try {
-      const m = (find as any)((mod: any) => {
-        if (!mod || typeof mod !== "object") return false;
-        for (const k of Object.keys(mod)) {
-          const v = mod[k];
-          if (typeof v === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) return true;
+      const mod = find((m: any) => {
+        if (!m || typeof m !== "object") return false;
+        for (const k of Object.keys(m)) {
+          if (typeof m[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
+            return true;
+          }
         }
         return false;
       });
-      if (m) {
-        for (const k of Object.keys(m)) {
-          if (typeof m[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
-            targetMod = m;
+      if (mod) {
+        for (const k of Object.keys(mod)) {
+          if (typeof mod[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
+            targetMod = mod;
             targetFnName = k;
             break;
           }
@@ -331,7 +370,7 @@ function patchDeveloperMode(): Unpatch | void {
 function diagnostics(): string[] {
   const out: string[] = [];
   const checks: [string, () => any][] = [
-    ["MessageAuthor", () => findNameplate().length],
+    ["nameplate.comps", () => findNameplateComponents().length],
     ["ctxMenu.builder", () => findByProps("buildMessageContextMenuItems")],
     ["ctxMenu.items", () => findByProps("menuItems")],
     ["ctxMenu.open", () => findByProps("openContextMenu")],

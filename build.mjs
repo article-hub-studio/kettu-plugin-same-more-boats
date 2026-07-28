@@ -2,9 +2,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { build } from "esbuild";
 
-const pluginDir = resolve("plugins/liquid-glass");
+const pluginDir = resolve("plugins/sameMoreBoats");
 const manifest = JSON.parse(await readFile(resolve(pluginDir, "manifest.json"), "utf8"));
-const outputDir = resolve("dist/liquid-glass");
+const outputDir = resolve("dist/sameMoreBoats");
 
 await mkdir(outputDir, { recursive: true });
 await build({

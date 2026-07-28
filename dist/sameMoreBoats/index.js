@@ -1,14 +1,1266 @@
-(function(F,g,i,u,re,ce,Y,I,T,ie,N,se,K){"use strict";const U=function(...e){try{console.log("[SMB]",...e)}catch{}};function M(e){try{const t=i.clipboard;if(t&&typeof t.setString=="function")return t.setString(e),!0;if(t&&typeof t.copy=="function")return t.copy(e),!0;if(t?.default?.setString)return t.default.setString(e),!0}catch(t){U("clipboard v1 FAIL",t)}try{const t=i.ReactNative.Clipboard;if(t?.setString)return t.setString(e),!0;if(t?.setStringAsync)return t.setStringAsync(e),!0}catch(t){U("clipboard RN FAIL",t)}try{const t=u.findByProps("setString","getString");if(t?.setString)return t.setString(e),!0}catch(t){U("clipboard metro FAIL",t)}try{const t=u.findByProps("Clipboard");if(t?.Clipboard?.setString)return t.Clipboard.setString(e),!0}catch{}try{const t=document.createElement("textarea");return t.value=e,t.style.position="fixed",t.style.opacity="0",document.body.appendChild(t),t.select(),document.execCommand("copy"),t.remove(),!0}catch{}return!1}const Q=function(...e){try{console.log("[SMB]",...e)}catch{}};function k(){const e=["ic_desktop_24px","ic_settings_24px","ic_compose_24px","ic_emoji_24px","ic_information_24px"];for(const t of e)try{const n=ce.getAssetIDByName(t);if(n)return n}catch{}}function ae(e){try{const t=i.toasts;if(t&&typeof t.open=="function"){t.open(e,k());return}if(t&&typeof t.showToast=="function"){t.showToast(e,k());return}}catch(t){Q("metroToast FAIL",t)}try{re.showToast(e,k())}catch(t){Q("vendettaToast FAIL",t)}}function y(e){ae(e)}const f=function(...e){try{console.log("[SMB]",...e)}catch{}},{View:q,Text:le,TouchableOpacity:He}=i.ReactNative,_=new Map;function ue(e,t){if(!e||!Array.isArray(t))return;let n=_.get(e);n||(n=new Map,_.set(e,n));for(const r of t)r?.id&&n.set(r.id,r)}function D(e,t){ue(e,t)}function fe(e,t){return _.get(e)?.get(t)??null}function de({text:e,color:t}){return i.React.createElement(q,{style:{backgroundColor:t||"#5865F2",borderRadius:4,paddingHorizontal:4,paddingVertical:1,marginLeft:4,alignSelf:"center"}},i.React.createElement(le,{style:{color:"#fff",fontSize:10,fontWeight:"700",textTransform:"uppercase"}},e))}function pe(e,t,n){const r=[];try{if(e?.bot&&r.push({text:"BOT",color:"#5865F2"}),e?.system&&r.push({text:"SYSTEM",color:"#4E5058"}),e?.flags!=null){const o=e.flags;o&1<<16&&r.push({text:"BOT",color:"#5865F2"}),o&1&&r.push({text:"STAFF",color:"#5865F2"}),o&1<<2&&r.push({text:"HYPESQUAD",color:"#f47b67"}),o&1<<3&&r.push({text:"BUG HUNTER",color:"#3ba55d"}),o&1<<9&&r.push({text:"EARLY",color:"#7289da"}),o&1<<14&&r.push({text:"BUG HUNTER GOLD",color:"#faa61a"}),o&1<<6&&r.push({text:"HYPESQUAD BRILLIANCE",color:"#f47b67"}),o&1<<7&&r.push({text:"HYPESQUAD BRAVERY",color:"#9c84ef"}),o&1<<8&&r.push({text:"HYPESQUAD BALANCE",color:"#45ddc0"})}if(t?.roles&&n)for(const o of t.roles){const c=fe(n,o);if(c?.tags?.bot_id||c?.tags?.integration_id||c?.icon||c?.unicode_emoji){const a=c.unicode_emoji?`${c.unicode_emoji} ${c.name}`:c.name;r.push({text:a,color:c.color?`#${c.color.toString(16).padStart(6,"0")}`:"#4E5058"})}}}catch{}return r}function ye(e){return i.React.createElement(q,{style:{flexDirection:"row",flexWrap:"wrap",alignItems:"center"}},...e.map(function(t,n){return i.React.createElement(de,{key:n,text:t.text,color:t.color})}))}function v(e,t){try{return t()}catch(n){return f("find",e,"ERR",n),null}}function J(){const e=[],t=new Set,n=function(o){o&&!t.has(o)&&(t.add(o),e.push(o))},r=["Nameplate","NameplateInner","Username","MessageAuthor","BotTag","BotTagRegular","AuthorTag"];for(const o of r){n(v("name:"+o,function(){return u.findByName(o,!1)}));const c=v("nameAll:"+o,function(){return u.findByNameAll(o,!1)});if(Array.isArray(c))for(const d of c)n(d);n(v("dn:"+o,function(){return u.findByDisplayName(o,!1)}));const a=v("dnAll:"+o,function(){return u.findByDisplayNameAll(o,!1)});if(Array.isArray(a))for(const d of a)n(d);const l=v("props:"+o,function(){const d=u.findByProps(o);return d?d[o]:null});n(l)}return e}function ge(e,t){if(!t.length||!e)return e;try{if(!i.React.isValidElement(e))return e;const n=ye(t),r={...e.props||{}},o=r.children;return Array.isArray(o)?r.children=[...o,n]:o==null?r.children=[n]:r.children=[o,n],i.React.cloneElement(e,r)}catch(n){return f("injectTags FAIL",n),e}}function he(e,t,n){if(!e)return;const r=[],o=function(a){try{if(typeof e[a]!="function")return!1;const l=g.after(a,e,function(d,S){try{return n(d,S)}catch(s){return f(t,a,"after FAIL",s),S}});if(typeof l=="function")return r.push(l),f(t,"patched",a),!0}catch(l){f(t,a,"patch FAIL",l)}return!1};let c=o("default");if(c||(c=o("type")),!c&&typeof e=="function")try{const a=g.after(e,function(l,d){try{return n(l,d)}catch(S){return f(t,"self FAIL",S),d}});typeof a=="function"&&(r.push(a),f(t,"patched self"),c=!0)}catch(a){f(t,"self patch FAIL",a)}if(!c){f(t,"no patchable key");return}return function(){return r.forEach(function(a){try{a()}catch{}})}}function me(){const e=J();if(!e.length){f("MessageAuthor: no components found");return}f("MessageAuthor: found",e.length,"candidates");const t=[];for(const n of e){const r=he(n,"msgAuthor",function(o,c){const a=o?.[0]??{},l=a.author??a.user??a.message?.author,d=a.member??a.message?.member,S=a.guildId??a.message?.guildId??a.channel?.guild_id;if(!l)return c;const s=pe(l,d,S);return s.length?ge(c,s):c});typeof r=="function"&&t.push(r)}if(!t.length){f("MessageAuthor: none patchable");return}return function(){return t.forEach(function(n){try{n()}catch{}})}}function be(){const e=["buildMessageContextMenuItems","buildContextMenuItems","menuItems","getMessageContextMenus","openContextMenu","buildMenu","getMenuItems","ContextMenuContainer","MenuContainer","ActionSheetPresenter","MessageContextMenu","ContextMenu","openMenu"];let t=null,n="";for(const r of e){const o=v("ctx:"+r,function(){return u.findByProps(r)});if(o&&typeof o[r]=="function"){t=o,n=r;break}}if(!t)try{const r=u.find(function(o){if(!o||typeof o!="object")return!1;for(const c of Object.keys(o))if(typeof o[c]=="function"&&/context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(c))return!0;return!1});if(r){for(const o of Object.keys(r))if(typeof r[o]=="function"&&/context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(o)){t=r,n=o;break}}}catch(r){f("ctx filter find FAIL",r)}if(!t||!n){f("ContextMenu: no builder found");return}return f("ContextMenu builder found:",n),g.after(n,t,function(r,o){try{if(!Array.isArray(o))return o;const c=r?.[0]??{},a=c.message??c.user??c.channel,l=[];return a?.id&&l.push({label:"Copy ID",id:"smb-copy-id",action:function(){M(String(a.id))&&y("Copied ID: "+a.id)}}),c.message?.id&&c.channelId&&l.push({label:"Copy Message Link",id:"smb-copy-link",action:function(){const d=c.guildId?`${c.guildId}/`:"@me/";M(`https://discord.com/channels/${d}${c.channelId}/${c.message.id}`)&&y("Message link copied")}}),c.message?.content&&l.push({label:"Copy Raw Message",id:"smb-copy-raw",action:function(){M(c.message.content)&&y("Raw message copied")}}),c.user?.id&&(l.push({label:"Copy User ID",id:"smb-copy-user-id",action:function(){M(String(c.user.id))&&y("User ID copied")}}),l.push({label:"Copy Username",id:"smb-copy-username",action:function(){const d=c.user.username+(c.user.discriminator?"#"+c.user.discriminator:"");M(d)&&y("Username copied")}})),c.channel?.id&&l.push({label:"Copy Channel ID",id:"smb-copy-channel-id",action:function(){M(String(c.channel.id))&&y("Channel ID copied")}}),l.length?(l.unshift({type:"divider",id:"smb-divider"}),[...o,...l]):o}catch(c){return f("contextMenu render FAIL",c),o}})}function Se(){try{const e=v("DeveloperModeStore",function(){return u.findByStoreName("DeveloperModeStore")});if(!e){f("DeveloperModeStore not found");return}const t=e.getDeveloperMode?.bind(e);if(typeof t!="function"){f("getDeveloperMode not a function");return}return e.getDeveloperMode=function(){return!0},f("DeveloperMode forced ON"),function(){try{e.getDeveloperMode=t}catch{}}}catch(e){f("patchDeveloperMode FAIL",e)}}function ve(){const e=[],t=[["MessageAuthor",function(){return J().length}],["ctxMenu.builder",function(){return u.findByProps("buildMessageContextMenuItems")}],["ctxMenu.items",function(){return u.findByProps("menuItems")}],["ctxMenu.open",function(){return u.findByProps("openContextMenu")}],["ctxMenu.container",function(){return u.findByProps("ContextMenuContainer")}],["nameplate",function(){return u.findByName("Nameplate",!1)}],["nameplateInner",function(){return u.findByName("NameplateInner",!1)}],["username",function(){return u.findByName("Username",!1)}],["botTag",function(){return u.findByName("BotTag",!1)}],["GuildStore",function(){return u.findByStoreName("GuildStore")}],["GuildMemberStore",function(){return u.findByStoreName("GuildMemberStore")}],["RoleStore",function(){return u.findByStoreName("RoleStore")}],["DeveloperModeStore",function(){return u.findByStoreName("DeveloperModeStore")}],["clipboard",function(){return u.findByProps("setString")}]];for(const[n,r]of t)try{const o=r();e.push(`${n}: ${o?"FOUND":"miss"}`)}catch{e.push(`${n}: ERR`)}return e}function Ae(){return ve()}function X(){const e=[],t=function(n,r){try{const o=r();typeof o=="function"&&e.push(o)}catch(o){f("patchComponents",n,"FAIL",o)}};return t("messageAuthor",me),t("contextMenu",be),t("developerMode",Se),f("component patches:",e.length),function(){return e.forEach(function(n){try{n()}catch{}})}}var Me=Object.freeze({__proto__:null,getDiagnostics:Ae,patchComponents:X,refreshRoleCache:D});const Re=function(...e){try{console.log("[SMB]",...e)}catch{}};function $(e,t=0){if(!(!e||typeof e!="object"||t>6)){if(Array.isArray(e)){for(const n of e)$(n,t+1);return}if(e.guildId&&Array.isArray(e.roles)&&D(e.guildId,e.roles),e.id&&Array.isArray(e.roles)&&D(e.id,e.roles),e.guild&&e.guild.id&&Array.isArray(e.guild.roles)&&D(e.guild.id,e.guild.roles),Array.isArray(e.guilds))for(const n of e.guilds)n?.id&&Array.isArray(n.roles)&&D(n.id,n.roles);for(const n of Object.keys(e)){if(n==="roles"||n==="guild"||n==="guilds")continue;const r=e[n];r&&typeof r=="object"&&$(r,t+1)}}}function Ce(){const e=[];return e.push(g.before("dispatch",i.FluxDispatcher,function(t){try{$(t?.[0])}catch{}})),Re("tags: role-cache feeder active"),function(){return e.forEach(function(t){try{t()}catch{}})}}const Z=15,xe=16,E=function(e){if(!(!e||e.__smbType)&&(e.type===Z||e.type===xe))try{Object.defineProperty(e,"__smbType",{value:e.type,enumerable:!1,configurable:!0})}catch{}};function Te(){const e=[];return e.push(g.before("dispatch",i.FluxDispatcher,function(t){const n=t?.[0];if(n&&(n.channel&&E(n.channel),Array.isArray(n.channels)&&n.channels.forEach(E),n.channelUpdates&&Object.values(n.channelUpdates).forEach(E),n.guild&&Array.isArray(n.guild.channels)&&n.guild.channels.forEach(E),Array.isArray(n.guilds)))for(const r of n.guilds)r&&Array.isArray(r.channels)&&r.channels.forEach(E)})),e.push(g.before("dispatch",i.FluxDispatcher,function(t){const n=t?.[0];if(n?.type==="FETCH_CHANNEL_INFO"&&n.channel?.type===Z)try{i.FluxDispatcher.dispatch({type:"LOAD_MESSAGES",channelId:n.channel.id})}catch{}})),function(){return e.forEach(function(t){try{t()}catch{}})}}const ee=[{key:"overview",label:"Overview"},{key:"roles",label:"Roles"},{key:"emoji",label:"Emoji"},{key:"stickers",label:"Stickers"},{key:"widget",label:"Widget"},{key:"automod",label:"AutoMod"},{key:"onboarding",label:"Onboarding"},{key:"incidents",label:"Incidents"},{key:"audit_log",label:"Audit Log"},{key:"members",label:"Members"},{key:"bans",label:"Bans"},{key:"integrations",label:"Integrations"},{key:"delete",label:"Delete Server"}];function De(){const e=[];return e.push(g.before("dispatch",i.FluxDispatcher,function(t){const n=t?.[0];if(!n?.type)return;const r=n.type;/GUILD.*SETTINGS|SETTINGS.*OPEN|GUILD.*CONFIG/i.test(r)&&(!Array.isArray(n.sections)||n.sections.length<ee.length)&&(n.sections=ee)})),function(){return e.forEach(function(t){try{t()}catch{}})}}function Ee(e){const t=e.filter(function(o){return o?.status!=="offline"}),n=e.filter(function(o){return o?.status==="offline"}),r=[{id:"online",label:"Online",count:t.length,collapsed:!1}];return n.length&&r.push({id:"offline",label:"Offline",count:n.length,collapsed:!0}),r}function Ie(){const e=[];return e.push(g.before("dispatch",i.FluxDispatcher,function(t){const n=t?.[0];if(!n)return;let r=null;Array.isArray(n.members)?r=n.members:n.member&&(r=[n.member]),r&&r.length&&(n.__smbGroups=Ee(r),n.__smbGrouped=!0)})),function(){return e.forEach(function(t){try{t()}catch{}})}}const te=function(...e){try{console.log("[SMB]",...e)}catch{}};function Le(){const e=[];return e.push(g.before("dispatch",i.FluxDispatcher,function(t){try{const n=t?.[0];if(!n?.type)return;/MESSAGE|CHANNEL|CONTEXT/i.test(n.type)&&te("ctx observe:",n.type)}catch{}})),te("contextMenu: observer active (render in components.ts)"),function(){return e.forEach(function(t){try{t()}catch{}})}}const Be=function(...e){try{console.log("[SMB]",...e)}catch{}};function Fe(){const e=[];let t=[],n=0;return e.push(g.before("dispatch",i.FluxDispatcher,function(r){const o=r?.[0];o?.type&&(t.push(o.type),t.length>200&&t.shift(),n++)})),y("DevTools logger active \u2014 actions logged to console"),Be("DevTools: listening to FluxDispatcher. Total captured:",n),function(){return e.forEach(function(r){try{r()}catch{}})}}const Ne=["guild_tags","role_tags","forum_channels","forum_search","guidelines_screen","member_list_grouping","server_guide","onboarding","community_guild_settings_v2","role_icon_upload","guild_role_subscriptions","auto_mod","guild_incidents","member_verification","developer_mode","dev_tools"];function w(e){if(!Array.isArray(e))return!1;const t=new Set(e);Ne.forEach(function(r){return t.add(r)});const n=Array.from(t);return n.length!==e.length?(e.splice(0,e.length,...n),!0):!1}function O(e,t=0){if(!(!e||typeof e!="object"||t>6)){if(Array.isArray(e)){for(const n of e)O(n,t+1);return}if(Array.isArray(e.features)&&w(e.features),e.guild&&Array.isArray(e.guild.features)&&w(e.guild.features),Array.isArray(e.guilds))for(const n of e.guilds)n&&Array.isArray(n.features)&&w(n.features);for(const n of Object.keys(e)){if(n==="features"||n==="guild"||n==="guilds")continue;const r=e[n];r&&typeof r=="object"&&O(r,t+1)}}}function Ue(e){const t=[];return t.push(g.before("dispatch",i.FluxDispatcher,function(n){try{O(n?.[0])}catch{}})),function(){return t.forEach(function(n){try{n()}catch{}})}}function ke(e){try{const t=document.createElement("style");return t.setAttribute("data-smb","true"),t.textContent=`
+"use strict";
+var __vendettaPlugin = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+    get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+  }) : x)(function(x) {
+    if (typeof require !== "undefined")
+      return require.apply(this, arguments);
+    throw new Error('Dynamic require of "' + x + '" is not supported');
+  });
+  var __esm = (fn, res) => function __init() {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  };
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // plugins/sameMoreBoats/src/modules/clipboard.ts
+  function copyText(text) {
+    var _a, _b;
+    try {
+      const c = import_common.clipboard;
+      if (c && typeof c.setString === "function") {
+        c.setString(text);
+        return true;
+      }
+      if (c && typeof c.copy === "function") {
+        c.copy(text);
+        return true;
+      }
+      if ((_a = c == null ? void 0 : c.default) == null ? void 0 : _a.setString) {
+        c.default.setString(text);
+        return true;
+      }
+    } catch (e) {
+      log("clipboard v1 FAIL", e);
+    }
+    try {
+      const rnClip = import_common2.ReactNative.Clipboard;
+      if (rnClip == null ? void 0 : rnClip.setString) {
+        rnClip.setString(text);
+        return true;
+      }
+      if (rnClip == null ? void 0 : rnClip.setStringAsync) {
+        rnClip.setStringAsync(text);
+        return true;
+      }
+    } catch (e) {
+      log("clipboard RN FAIL", e);
+    }
+    try {
+      const mod = (0, import_metro.findByProps)("setString", "getString");
+      if (mod == null ? void 0 : mod.setString) {
+        mod.setString(text);
+        return true;
+      }
+    } catch (e) {
+      log("clipboard metro FAIL", e);
+    }
+    try {
+      const mod = (0, import_metro.findByProps)("Clipboard");
+      if ((_b = mod == null ? void 0 : mod.Clipboard) == null ? void 0 : _b.setString) {
+        mod.Clipboard.setString(text);
+        return true;
+      }
+    } catch {
+    }
+    try {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      el.remove();
+      return true;
+    } catch {
+    }
+    return false;
+  }
+  var import_common, import_common2, import_metro, log;
+  var init_clipboard = __esm({
+    "plugins/sameMoreBoats/src/modules/clipboard.ts"() {
+      "use strict";
+      import_common = __require("@vendetta/metro/common");
+      import_common2 = __require("@vendetta/metro/common");
+      import_metro = __require("@vendetta/metro");
+      log = (...a) => {
+        try {
+          console.log("[SMB]", ...a);
+        } catch {
+        }
+      };
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/toast.ts
+  function safeIcon() {
+    const ids = ["ic_desktop_24px", "ic_settings_24px", "ic_compose_24px", "ic_emoji_24px", "ic_information_24px"];
+    for (const n of ids) {
+      try {
+        const i = (0, import_assets.getAssetIDByName)(n);
+        if (i)
+          return i;
+      } catch {
+      }
+    }
+    return void 0;
+  }
+  function metroToast(msg) {
+    try {
+      const t = import_common3.toasts;
+      if (t && typeof t.open === "function") {
+        t.open(msg, safeIcon());
+        return;
+      }
+      if (t && typeof t.showToast === "function") {
+        t.showToast(msg, safeIcon());
+        return;
+      }
+    } catch (e) {
+      log2("metroToast FAIL", e);
+    }
+    try {
+      (0, import_toasts.showToast)(msg, safeIcon());
+    } catch (e) {
+      log2("vendettaToast FAIL", e);
+    }
+  }
+  function toast(msg) {
+    metroToast(msg);
+  }
+  var import_common3, import_toasts, import_assets, log2;
+  var init_toast = __esm({
+    "plugins/sameMoreBoats/src/modules/toast.ts"() {
+      "use strict";
+      import_common3 = __require("@vendetta/metro/common");
+      import_toasts = __require("@vendetta/ui/toasts");
+      import_assets = __require("@vendetta/ui/assets");
+      log2 = (...a) => {
+        try {
+          console.log("[SMB]", ...a);
+        } catch {
+        }
+      };
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/components.ts
+  function refreshRoles(guildId, roles) {
+    if (!guildId || !Array.isArray(roles))
+      return;
+    let map = roleCache.get(guildId);
+    if (!map) {
+      map = /* @__PURE__ */ new Map();
+      roleCache.set(guildId, map);
+    }
+    for (const r of roles)
+      if (r == null ? void 0 : r.id)
+        map.set(r.id, r);
+  }
+  function refreshRoleCache(guildId, roles) {
+    refreshRoles(guildId, roles);
+  }
+  function findRole(guildId, roleId) {
+    var _a, _b;
+    return (_b = (_a = roleCache.get(guildId)) == null ? void 0 : _a.get(roleId)) != null ? _b : null;
+  }
+  function BotTagPill({ text, color }) {
+    return import_common4.React.createElement(
+      View,
+      {
+        style: {
+          backgroundColor: color || "#5865F2",
+          borderRadius: 4,
+          paddingHorizontal: 4,
+          paddingVertical: 1,
+          marginLeft: 4,
+          alignSelf: "center"
+        }
+      },
+      import_common4.React.createElement(
+        Text,
+        { style: { color: "#fff", fontSize: 10, fontWeight: "700", textTransform: "uppercase" } },
+        text
+      )
+    );
+  }
+  function computeTagsFor(author, member, guildId) {
+    var _a, _b;
+    const tags = [];
+    try {
+      if (author == null ? void 0 : author.bot)
+        tags.push({ text: "BOT", color: "#5865F2" });
+      if (author == null ? void 0 : author.system)
+        tags.push({ text: "SYSTEM", color: "#4E5058" });
+      if ((author == null ? void 0 : author.flags) != null) {
+        const flags = author.flags;
+        if (flags & 1 << 16)
+          tags.push({ text: "BOT", color: "#5865F2" });
+        if (flags & 1)
+          tags.push({ text: "STAFF", color: "#5865F2" });
+        if (flags & 1 << 2)
+          tags.push({ text: "HYPESQUAD", color: "#f47b67" });
+        if (flags & 1 << 3)
+          tags.push({ text: "BUG HUNTER", color: "#3ba55d" });
+        if (flags & 1 << 9)
+          tags.push({ text: "EARLY", color: "#7289da" });
+        if (flags & 1 << 14)
+          tags.push({ text: "BUG HUNTER GOLD", color: "#faa61a" });
+        if (flags & 1 << 6)
+          tags.push({ text: "HYPESQUAD BRILLIANCE", color: "#f47b67" });
+        if (flags & 1 << 7)
+          tags.push({ text: "HYPESQUAD BRAVERY", color: "#9c84ef" });
+        if (flags & 1 << 8)
+          tags.push({ text: "HYPESQUAD BALANCE", color: "#45ddc0" });
+      }
+      if ((member == null ? void 0 : member.roles) && guildId) {
+        for (const roleId of member.roles) {
+          const role = findRole(guildId, roleId);
+          if (((_a = role == null ? void 0 : role.tags) == null ? void 0 : _a.bot_id) || ((_b = role == null ? void 0 : role.tags) == null ? void 0 : _b.integration_id) || (role == null ? void 0 : role.icon) || (role == null ? void 0 : role.unicode_emoji)) {
+            const name = role.unicode_emoji ? `${role.unicode_emoji} ${role.name}` : role.name;
+            tags.push({ text: name, color: role.color ? `#${role.color.toString(16).padStart(6, "0")}` : "#4E5058" });
+          }
+        }
+      }
+    } catch {
+    }
+    return tags;
+  }
+  function tagsRow(tags) {
+    return import_common4.React.createElement(
+      View,
+      { style: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" } },
+      ...tags.map((t, i) => import_common4.React.createElement(BotTagPill, { key: i, text: t.text, color: t.color }))
+    );
+  }
+  function safeFind(label, fn) {
+    try {
+      const r = fn();
+      return r;
+    } catch (e) {
+      log3("find", label, "ERR", e);
+      return null;
+    }
+  }
+  function findNameplateComponents() {
+    const results = [];
+    const seen = /* @__PURE__ */ new Set();
+    const add = (x) => {
+      if (x && !seen.has(x)) {
+        seen.add(x);
+        results.push(x);
+      }
+    };
+    const names = ["Nameplate", "NameplateInner", "Username", "MessageAuthor", "BotTag", "BotTagRegular", "AuthorTag", "RoleIcon", "PillWrapper", "ButtonPill"];
+    for (const n of names) {
+      add(safeFind("name:" + n, () => (0, import_metro2.findByName)(n, false)));
+      const all = safeFind("nameAll:" + n, () => (0, import_metro2.findByNameAll)(n, false));
+      if (Array.isArray(all))
+        for (const x of all)
+          add(x);
+      add(safeFind("dn:" + n, () => (0, import_metro2.findByDisplayName)(n, false)));
+      const dall = safeFind("dnAll:" + n, () => (0, import_metro2.findByDisplayNameAll)(n, false));
+      if (Array.isArray(dall))
+        for (const x of dall)
+          add(x);
+      const p = safeFind("props:" + n, () => {
+        const m = (0, import_metro2.findByProps)(n);
+        return m ? m[n] : null;
+      });
+      add(p);
+      const filterFound = safeFind("filter:" + n, () => (0, import_metro2.find)((m) => {
+        if (typeof m === "function" && (m.displayName === n || m.name === n))
+          return true;
+        if (m && typeof m === "object") {
+          for (const k of Object.keys(m)) {
+            try {
+              const v = m[k];
+              if (typeof v === "function" && (v.displayName === n || v.name === n))
+                return true;
+            } catch {
+            }
+          }
+        }
+        return false;
+      }));
+      add(filterFound);
+    }
+    return results;
+  }
+  function injectTagsIntoElement(ret, tags) {
+    if (!tags.length || !ret)
+      return ret;
+    try {
+      if (!import_common4.React.isValidElement(ret))
+        return ret;
+      const injected = tagsRow(tags);
+      const props = { ...ret.props || {} };
+      const children = props.children;
+      if (Array.isArray(children)) {
+        props.children = [...children, injected];
+      } else if (children === void 0 || children === null) {
+        props.children = [injected];
+      } else {
+        props.children = [children, injected];
+      }
+      return import_common4.React.cloneElement(ret, props);
+    } catch (e) {
+      log3("injectTags FAIL", e);
+      return ret;
+    }
+  }
+  function patchComponentRender(comp, label, handleRet) {
+    if (!comp)
+      return;
+    const unpatches = [];
+    const tryPatchKey = (parent, key) => {
+      try {
+        const target = parent == null ? void 0 : parent[key];
+        if (typeof target !== "function")
+          return false;
+        const un = (0, import_patcher.after)(key, parent, (args, ret) => {
+          try {
+            return handleRet(args, ret);
+          } catch (e) {
+            log3(label, key, "after FAIL", e);
+            return ret;
+          }
+        });
+        if (typeof un === "function") {
+          unpatches.push(un);
+          log3(label, "patched", key);
+          return true;
+        }
+      } catch (e) {
+        log3(label, key, "patch FAIL", e);
+      }
+      return false;
+    };
+    let ok = tryPatchKey(comp, "default");
+    if (!ok)
+      ok = tryPatchKey(comp, "type");
+    if (!ok && typeof comp === "function") {
+      try {
+        const un = (0, import_patcher.after)(comp, (args, ret) => {
+          try {
+            return handleRet(args, ret);
+          } catch (e) {
+            log3(label, "self FAIL", e);
+            return ret;
+          }
+        });
+        if (typeof un === "function") {
+          unpatches.push(un);
+          log3(label, "patched self");
+          ok = true;
+        }
+      } catch (e) {
+        log3(label, "self patch FAIL", e);
+      }
+    }
+    if (!ok && (comp == null ? void 0 : comp.type) && typeof comp.type === "function") {
+      try {
+        const un = (0, import_patcher.after)("type", comp, (args, ret) => {
+          try {
+            return handleRet(args, ret);
+          } catch (e) {
+            log3(label, "type FAIL", e);
+            return ret;
+          }
+        });
+        if (typeof un === "function") {
+          unpatches.push(un);
+          log3(label, "patched .type");
+          ok = true;
+        }
+      } catch (e) {
+        log3(label, "type patch FAIL", e);
+      }
+    }
+    if (!ok && (comp == null ? void 0 : comp.render) && typeof comp.render === "function") {
+      try {
+        const un = (0, import_patcher.after)("render", comp, (args, ret) => {
+          try {
+            return handleRet(args, ret);
+          } catch (e) {
+            log3(label, "render FAIL", e);
+            return ret;
+          }
+        });
+        if (typeof un === "function") {
+          unpatches.push(un);
+          log3(label, "patched .render");
+          ok = true;
+        }
+      } catch (e) {
+        log3(label, "render patch FAIL", e);
+      }
+    }
+    if (!ok) {
+      log3(label, "no patchable key");
+      return;
+    }
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  function patchMessageAuthor() {
+    const comps = findNameplateComponents();
+    if (!comps.length) {
+      log3("MessageAuthor: no components found");
+      return;
+    }
+    log3("MessageAuthor: found", comps.length, "candidates");
+    const unpatches = [];
+    for (const comp of comps) {
+      const un = patchComponentRender(comp, "msgAuthor", (args, ret) => {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+        const props = (_a = args == null ? void 0 : args[0]) != null ? _a : {};
+        const author = (_d = (_b = props.author) != null ? _b : props.user) != null ? _d : (_c = props.message) == null ? void 0 : _c.author;
+        const member = (_f = props.member) != null ? _f : (_e = props.message) == null ? void 0 : _e.member;
+        const guildId = (_j = (_h = props.guildId) != null ? _h : (_g = props.message) == null ? void 0 : _g.guildId) != null ? _j : (_i = props.channel) == null ? void 0 : _i.guild_id;
+        if (!author)
+          return ret;
+        const tags = computeTagsFor(author, member, guildId);
+        if (!tags.length)
+          return ret;
+        return injectTagsIntoElement(ret, tags);
+      });
+      if (typeof un === "function")
+        unpatches.push(un);
+    }
+    if (!unpatches.length) {
+      log3("MessageAuthor: none patchable");
+      return;
+    }
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  function patchContextMenuItems() {
+    const finderKeys = [
+      "buildMessageContextMenuItems",
+      "buildContextMenuItems",
+      "menuItems",
+      "getMessageContextMenus",
+      "openContextMenu",
+      "buildMenu",
+      "getMenuItems",
+      "ContextMenuContainer",
+      "MenuContainer",
+      "ActionSheetPresenter"
+    ];
+    let targetMod = null;
+    let targetFnName = null;
+    for (const k of finderKeys) {
+      const mod = safeFind("ctx:" + k, () => (0, import_metro2.findByProps)(k));
+      if (mod && typeof mod[k] === "function") {
+        targetMod = mod;
+        targetFnName = k;
+        break;
+      }
+    }
+    if (!targetMod || !targetFnName) {
+      try {
+        const mod = (0, import_metro2.find)((m) => {
+          if (!m || typeof m !== "object")
+            return false;
+          for (const k of Object.keys(m)) {
+            if (typeof m[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
+              return true;
+            }
+          }
+          return false;
+        });
+        if (mod) {
+          for (const k of Object.keys(mod)) {
+            if (typeof mod[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
+              targetMod = mod;
+              targetFnName = k;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        log3("ctx filter find FAIL", e);
+      }
+    }
+    if (!targetMod || !targetFnName) {
+      log3("ContextMenu: no builder found");
+      return;
+    }
+    log3("ContextMenu builder found:", targetFnName);
+    return (0, import_patcher.after)(targetFnName, targetMod, (args, ret) => {
+      var _a, _b, _c, _d, _e, _f, _g;
+      try {
+        if (!Array.isArray(ret))
+          return ret;
+        const ctx = (_a = args == null ? void 0 : args[0]) != null ? _a : {};
+        const target = (_c = (_b = ctx.message) != null ? _b : ctx.user) != null ? _c : ctx.channel;
+        const additions = [];
+        if (target == null ? void 0 : target.id) {
+          additions.push({
+            label: "Copy ID",
+            id: "smb-copy-id",
+            action: () => {
+              if (copyText(String(target.id)))
+                toast("Copied ID: " + target.id);
+            }
+          });
+        }
+        if (((_d = ctx.message) == null ? void 0 : _d.id) && ctx.channelId) {
+          additions.push({
+            label: "Copy Message Link",
+            id: "smb-copy-link",
+            action: () => {
+              const guild = ctx.guildId ? `${ctx.guildId}/` : "@me/";
+              if (copyText(`https://discord.com/channels/${guild}${ctx.channelId}/${ctx.message.id}`))
+                toast("Message link copied");
+            }
+          });
+        }
+        if ((_e = ctx.message) == null ? void 0 : _e.content) {
+          additions.push({
+            label: "Copy Raw Message",
+            id: "smb-copy-raw",
+            action: () => {
+              if (copyText(ctx.message.content))
+                toast("Raw message copied");
+            }
+          });
+        }
+        if ((_f = ctx.user) == null ? void 0 : _f.id) {
+          additions.push({
+            label: "Copy User ID",
+            id: "smb-copy-user-id",
+            action: () => {
+              if (copyText(String(ctx.user.id)))
+                toast("User ID copied");
+            }
+          });
+          additions.push({
+            label: "Copy Username",
+            id: "smb-copy-username",
+            action: () => {
+              const uname = ctx.user.username + (ctx.user.discriminator ? "#" + ctx.user.discriminator : "");
+              if (copyText(uname))
+                toast("Username copied");
+            }
+          });
+        }
+        if ((_g = ctx.channel) == null ? void 0 : _g.id) {
+          additions.push({
+            label: "Copy Channel ID",
+            id: "smb-copy-channel-id",
+            action: () => {
+              if (copyText(String(ctx.channel.id)))
+                toast("Channel ID copied");
+            }
+          });
+        }
+        if (additions.length) {
+          additions.unshift({ type: "divider", id: "smb-divider" });
+          return [...ret, ...additions];
+        }
+        return ret;
+      } catch (e) {
+        log3("contextMenu render FAIL", e);
+        return ret;
+      }
+    });
+  }
+  function patchDeveloperMode() {
+    var _a;
+    try {
+      const store = safeFind("DeveloperModeStore", () => (0, import_metro2.findByStoreName)("DeveloperModeStore"));
+      if (!store) {
+        log3("DeveloperModeStore not found");
+        return;
+      }
+      const orig = (_a = store.getDeveloperMode) == null ? void 0 : _a.bind(store);
+      if (typeof orig !== "function") {
+        log3("getDeveloperMode not a function");
+        return;
+      }
+      store.getDeveloperMode = () => true;
+      log3("DeveloperMode forced ON");
+      return () => {
+        try {
+          store.getDeveloperMode = orig;
+        } catch {
+        }
+      };
+    } catch (e) {
+      log3("patchDeveloperMode FAIL", e);
+    }
+  }
+  function patchComponents() {
+    const un = [];
+    const safe = (label, fn) => {
+      try {
+        const r = fn();
+        if (typeof r === "function")
+          un.push(r);
+      } catch (e) {
+        log3("patchComponents", label, "FAIL", e);
+      }
+    };
+    safe("messageAuthor", patchMessageAuthor);
+    safe("contextMenu", patchContextMenuItems);
+    safe("developerMode", patchDeveloperMode);
+    log3("component patches:", un.length);
+    return () => un.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  var import_common4, import_metro2, import_patcher, log3, View, Text, TouchableOpacity, roleCache;
+  var init_components = __esm({
+    "plugins/sameMoreBoats/src/modules/components.ts"() {
+      "use strict";
+      import_common4 = __require("@vendetta/metro/common");
+      import_metro2 = __require("@vendetta/metro");
+      import_patcher = __require("@vendetta/patcher");
+      init_clipboard();
+      init_toast();
+      log3 = (...a) => {
+        try {
+          console.log("[SMB]", ...a);
+        } catch {
+        }
+      };
+      ({ View, Text, TouchableOpacity } = import_common4.ReactNative);
+      roleCache = /* @__PURE__ */ new Map();
+    }
+  });
+
+  // plugins/sameMoreBoats/src/index.ts
+  var src_exports = {};
+  __export(src_exports, {
+    default: () => src_default
+  });
+
+  // plugins/sameMoreBoats/src/modules/tags.ts
+  var import_patcher2 = __require("@vendetta/patcher");
+  var import_common5 = __require("@vendetta/metro/common");
+  init_components();
+  var log4 = (...a) => {
+    try {
+      console.log("[SMB]", ...a);
+    } catch {
+    }
+  };
+  function harvestRoles(obj, depth = 0) {
+    if (!obj || typeof obj !== "object" || depth > 6)
+      return;
+    if (Array.isArray(obj)) {
+      for (const x of obj)
+        harvestRoles(x, depth + 1);
+      return;
+    }
+    if (obj.guildId && Array.isArray(obj.roles))
+      refreshRoleCache(obj.guildId, obj.roles);
+    if (obj.id && Array.isArray(obj.roles))
+      refreshRoleCache(obj.id, obj.roles);
+    if (obj.guild && obj.guild.id && Array.isArray(obj.guild.roles))
+      refreshRoleCache(obj.guild.id, obj.guild.roles);
+    if (Array.isArray(obj.guilds)) {
+      for (const g of obj.guilds)
+        if ((g == null ? void 0 : g.id) && Array.isArray(g.roles))
+          refreshRoleCache(g.id, g.roles);
+    }
+    for (const k of Object.keys(obj)) {
+      if (k === "roles" || k === "guild" || k === "guilds")
+        continue;
+      const v = obj[k];
+      if (v && typeof v === "object")
+        harvestRoles(v, depth + 1);
+    }
+  }
+  function enableTags() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher2.before)("dispatch", import_common5.FluxDispatcher, (args) => {
+        try {
+          harvestRoles(args == null ? void 0 : args[0]);
+        } catch {
+        }
+      })
+    );
+    log4("tags: role-cache feeder active");
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/forums.ts
+  var import_patcher3 = __require("@vendetta/patcher");
+  var import_common6 = __require("@vendetta/metro/common");
+  var FORUM = 15;
+  var MEDIA = 16;
+  var stamp = (ch) => {
+    if (!ch || ch.__smbType)
+      return;
+    if (ch.type === FORUM || ch.type === MEDIA) {
+      try {
+        Object.defineProperty(ch, "__smbType", { value: ch.type, enumerable: false, configurable: true });
+      } catch {
+      }
+    }
+  };
+  function enableForums() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher3.before)("dispatch", import_common6.FluxDispatcher, (args) => {
+        const action = args == null ? void 0 : args[0];
+        if (!action)
+          return;
+        if (action.channel)
+          stamp(action.channel);
+        if (Array.isArray(action.channels))
+          action.channels.forEach(stamp);
+        if (action.channelUpdates)
+          Object.values(action.channelUpdates).forEach(stamp);
+        if (action.guild && Array.isArray(action.guild.channels))
+          action.guild.channels.forEach(stamp);
+        if (Array.isArray(action.guilds)) {
+          for (const g of action.guilds)
+            if (g && Array.isArray(g.channels))
+              g.channels.forEach(stamp);
+        }
+      })
+    );
+    unpatches.push(
+      (0, import_patcher3.before)("dispatch", import_common6.FluxDispatcher, (args) => {
+        var _a;
+        const action = args == null ? void 0 : args[0];
+        if ((action == null ? void 0 : action.type) === "FETCH_CHANNEL_INFO" && ((_a = action.channel) == null ? void 0 : _a.type) === FORUM) {
+          try {
+            import_common6.FluxDispatcher.dispatch({
+              type: "LOAD_MESSAGES",
+              channelId: action.channel.id
+            });
+          } catch {
+          }
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/serverSettings.ts
+  var import_patcher4 = __require("@vendetta/patcher");
+  var import_common7 = __require("@vendetta/metro/common");
+  var FULL_SECTIONS = [
+    { key: "overview", label: "Overview" },
+    { key: "roles", label: "Roles" },
+    { key: "emoji", label: "Emoji" },
+    { key: "stickers", label: "Stickers" },
+    { key: "widget", label: "Widget" },
+    { key: "automod", label: "AutoMod" },
+    { key: "onboarding", label: "Onboarding" },
+    { key: "incidents", label: "Incidents" },
+    { key: "audit_log", label: "Audit Log" },
+    { key: "members", label: "Members" },
+    { key: "bans", label: "Bans" },
+    { key: "integrations", label: "Integrations" },
+    { key: "delete", label: "Delete Server" }
+  ];
+  function enableServerSettings() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher4.before)("dispatch", import_common7.FluxDispatcher, (args) => {
+        const action = args == null ? void 0 : args[0];
+        if (!(action == null ? void 0 : action.type))
+          return;
+        const t = action.type;
+        if (/GUILD.*SETTINGS|SETTINGS.*OPEN|GUILD.*CONFIG/i.test(t)) {
+          if (!Array.isArray(action.sections) || action.sections.length < FULL_SECTIONS.length) {
+            action.sections = FULL_SECTIONS;
+          }
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/memberList.ts
+  var import_patcher5 = __require("@vendetta/patcher");
+  var import_common8 = __require("@vendetta/metro/common");
+  function buildGroups(members) {
+    const online = members.filter((m) => (m == null ? void 0 : m.status) !== "offline");
+    const offline = members.filter((m) => (m == null ? void 0 : m.status) === "offline");
+    const groups = [
+      { id: "online", label: "Online", count: online.length, collapsed: false }
+    ];
+    if (offline.length)
+      groups.push({ id: "offline", label: "Offline", count: offline.length, collapsed: true });
+    return groups;
+  }
+  function enableGroupedMemberList() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher5.before)("dispatch", import_common8.FluxDispatcher, (args) => {
+        const action = args == null ? void 0 : args[0];
+        if (!action)
+          return;
+        let members = null;
+        if (Array.isArray(action.members))
+          members = action.members;
+        else if (action.member)
+          members = [action.member];
+        if (members && members.length) {
+          action.__smbGroups = buildGroups(members);
+          action.__smbGrouped = true;
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/contextMenu.ts
+  var import_patcher6 = __require("@vendetta/patcher");
+  var import_common9 = __require("@vendetta/metro/common");
+  var log5 = (...a) => {
+    try {
+      console.log("[SMB]", ...a);
+    } catch {
+    }
+  };
+  function expandContextMenu() {
+    const un = [];
+    un.push(
+      (0, import_patcher6.before)("dispatch", import_common9.FluxDispatcher, (args) => {
+        try {
+          const a = args == null ? void 0 : args[0];
+          if (!(a == null ? void 0 : a.type))
+            return;
+          if (/MESSAGE|CHANNEL|CONTEXT/i.test(a.type)) {
+            log5("ctx observe:", a.type);
+          }
+        } catch {
+        }
+      })
+    );
+    log5("contextMenu: observer active (render in components.ts)");
+    return () => un.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/devtools.ts
+  var import_patcher7 = __require("@vendetta/patcher");
+  var import_common10 = __require("@vendetta/metro/common");
+  init_toast();
+  var log6 = (...a) => {
+    try {
+      console.log("[SMB]", ...a);
+    } catch {
+    }
+  };
+  function enableDevTools() {
+    const unpatches = [];
+    let buffer2 = [];
+    let count = 0;
+    unpatches.push(
+      (0, import_patcher7.before)("dispatch", import_common10.FluxDispatcher, (args) => {
+        const a = args == null ? void 0 : args[0];
+        if (a == null ? void 0 : a.type) {
+          buffer2.push(a.type);
+          if (buffer2.length > 200)
+            buffer2.shift();
+          count++;
+        }
+      })
+    );
+    toast("DevTools logger active \u2014 actions logged to console");
+    log6("DevTools: listening to FluxDispatcher. Total captured:", count);
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/featureGates.ts
+  var import_patcher8 = __require("@vendetta/patcher");
+  var import_common11 = __require("@vendetta/metro/common");
+  var PC_GATES = [
+    "guild_tags",
+    "role_tags",
+    "forum_channels",
+    "forum_search",
+    "guidelines_screen",
+    "member_list_grouping",
+    "server_guide",
+    "onboarding",
+    "community_guild_settings_v2",
+    "role_icon_upload",
+    "guild_role_subscriptions",
+    "auto_mod",
+    "guild_incidents",
+    "member_verification",
+    "developer_mode",
+    "dev_tools"
+  ];
+  function addGates(features) {
+    if (!Array.isArray(features))
+      return false;
+    const set = new Set(features);
+    PC_GATES.forEach((g) => set.add(g));
+    const arr = Array.from(set);
+    if (arr.length !== features.length) {
+      features.splice(0, features.length, ...arr);
+      return true;
+    }
+    return false;
+  }
+  function harvest(obj, depth = 0) {
+    if (!obj || typeof obj !== "object" || depth > 6)
+      return;
+    if (Array.isArray(obj)) {
+      for (const x of obj)
+        harvest(x, depth + 1);
+      return;
+    }
+    if (Array.isArray(obj.features))
+      addGates(obj.features);
+    if (obj.guild && Array.isArray(obj.guild.features))
+      addGates(obj.guild.features);
+    if (Array.isArray(obj.guilds)) {
+      for (const g of obj.guilds)
+        if (g && Array.isArray(g.features))
+          addGates(g.features);
+    }
+    for (const k of Object.keys(obj)) {
+      if (k === "features" || k === "guild" || k === "guilds")
+        continue;
+      const v = obj[k];
+      if (v && typeof v === "object")
+        harvest(v, depth + 1);
+    }
+  }
+  function patchFeatureGates(_cfg) {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher8.before)("dispatch", import_common11.FluxDispatcher, (args) => {
+        try {
+          harvest(args == null ? void 0 : args[0]);
+        } catch {
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+
+  // plugins/sameMoreBoats/src/modules/styles.ts
+  function injectStyles(cfg) {
+    var _a, _b;
+    try {
+      const el = document.createElement("style");
+      el.setAttribute("data-smb", "true");
+      el.textContent = `
       [class*="roleTag"], [class*="botTag"] { display: inline-flex !important; }
       [class*="authorTag"] { display: inline-flex !important; margin-left: 4px; }
       [class*="forumChannelList"] { overflow-x: auto !important; flex-direction: row !important; }
       [class*="forumThreadCard"] { min-width: 280px !important; }
       [class*="guildSettingsSidebar"] { display: flex !important; }
       [class*="memberListGroup"] { display: flex !important; flex-direction: column !important; }
-      ${e.forceDesktopLayout?`
+      ${cfg.forceDesktopLayout ? `
       body { font-size: 14px !important; }
       [class*="sidebar"] { width: 240px !important; }
-      `:""}
-    `,document.head?.appendChild?.(t),t}catch{return null}}const P=function(...e){try{console.log("[SMB]",...e)}catch{}};function j(e){try{return e()}catch{return null}}function _e(){const e=[],t=["RolePill","ForumPostList","ForumPostGrid","ForumPostPressableContainer","ForumPostActionBar","ProfileBanner","MemberCount","ChannelScreen","ChannelBadge","FastList","ViewHolderInternal","TypingIndicatorInner","BotTag","BotTagRegular","RoleTag","AuthorTag","MemberListGroup","MemberListItem","MembersList","ContextMenu","MessageContextMenu","Nameplate","NameplateInner","Username","MessageAuthor"];for(const o of t){const c=j(function(){return u.findByDisplayNameAll(o)});e.push(`dnAll:${o} ${c&&c.length?"OK "+c.length:"miss"}`)}for(const o of t){const c=j(function(){return u.findByProps(o)});if(c){const a=c[o],l=a?.displayName??a?.name??"?";e.push(`props:${o} OK dn=${l} type=${typeof a}`)}else e.push(`props:${o} miss`)}for(const o of t){const c=j(function(){return u.findByName(o,!1)});e.push(`name:${o} ${c?"OK":"miss"}`)}const n=["Role","Tag","Forum","Profile","Member","Channel","Bot","Badge","Context","Menu","Guild","Setting","MessageAuthor","Nameplate"];try{const o=u.find(function(c){if(!c||typeof c!="object")return!1;const a=function(l){if(!l||typeof l!="object")return!1;const d=l.displayName;if(typeof d=="string"){for(const S of n)if(d.toLowerCase().includes(S.toLowerCase()))return!0}return!1};if(a(c))return!0;for(const l of Object.keys(c))try{if(a(c[l]))return!0}catch{}return!1});if(o){const c=[],a=function(l){l&&typeof l=="object"&&typeof l.displayName=="string"&&c.push(l.displayName)};a(o);for(const l of Object.keys(o))try{a(o[l])}catch{}e.push(`filter.find matched, displayNames: ${[...new Set(c)].slice(0,30).join(", ")}`)}else e.push("filter.find: no match")}catch(o){e.push(`filter.find FAIL: ${String(o?.message??o).slice(0,80)}`)}P("recon v2 done:",e.length,"lines");const r=e.join(`
-`);try{T.showConfirmationAlert({title:"SMB recon",content:r,confirmText:"OK",isDismissable:!0,onConfirm:function(){}})}catch(o){P("recon modal FAIL",o),e.forEach(function(c){return P("RECON:",c)})}}const h=function(...e){try{console.log("[SMB]",...e)}catch{}},G={tags:!0,forums:!0,serverSettings:!0,groupedMembers:!0,contextMenu:!0,devTools:!1,forceDesktopLayout:!1,recon:!1,devtoolsUrl:""};let p={...G},z=null;async function $e(){return z||(z=async function(){try{const e=N.createMMKVBackend("SMBSettings"),t=await N.createStorage(e);p=N.wrapSync(t);for(const n of Object.keys(G))(p[n]===void 0||p[n]===null)&&(p[n]=G[n]);h("storage init ok",JSON.stringify(p))}catch(e){h("storage init FAIL",e)}}(),z)}const{View:m,Text:b,TextInput:We,ScrollView:we,TouchableOpacity:R}=i.ReactNative,{FormSection:Ve,FormRow:ne,FormSwitch:oe,FormDivider:Ye,FormLabel:Ke}=ie.Forms;function H({label:e,sublabel:t,value:n,onToggle:r}){try{if(ne&&oe)return i.React.createElement(ne,{label:e,subLabel:t,trailing:i.React.createElement(oe,{value:n,onValueChange:r})})}catch(o){h("FormRow fail",o)}return i.React.createElement(m,{style:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingVertical:12,paddingHorizontal:16}},i.React.createElement(m,{style:{flex:1}},i.React.createElement(b,{style:{color:"#dcddde",fontSize:16,fontWeight:"500"}},e),t?i.React.createElement(b,{style:{color:"#9697a0",fontSize:13,marginTop:2}},t):null),i.React.createElement(R,{onPress:function(){return r(!n)},activeOpacity:.7},i.React.createElement(m,{style:{width:44,height:26,borderRadius:13,backgroundColor:n?"#5865F2":"#4f545c",justifyContent:"center",alignItems:n?"flex-end":"flex-start",paddingHorizontal:2}},i.React.createElement(m,{style:{width:22,height:22,borderRadius:11,backgroundColor:"#fff"}}))))}function Oe({close:e}){const[,t]=i.React.useState(0),n=function(){return t(function(s){return s+1})},r=function(s){return function(A){p[s]=A;try{p[s]=A}catch{}n(),y(`${s}: ${A?"ON":"OFF"}`)}},o=function(){try{T.showInputAlert({title:"ReactDevTools URL",placeholder:"ws://192.168.x.x:8097",initialValue:p.devtoolsUrl||"",confirmText:"Save",onConfirm:function(s){p.devtoolsUrl=s,n(),y("DevTools URL saved")}})}catch(s){h("editUrl fail",s)}},c=function(){try{const s=p.devtoolsUrl;if(!s){y("Set a URL first"),o();return}Y.connectToDebugger(s),y("Connecting to DevTools\u2026")}catch(s){h("connect fail",s),y("Connect failed: "+String(s))}},a=function(){try{Promise.resolve().then(function(){return Me}).then(function(s){const A=s.getDiagnostics?s.getDiagnostics():["(no diag)"];T.showConfirmationAlert({title:"SMB Status",content:A.join(`
-`),confirmText:"OK",isDismissable:!0,onConfirm:function(){}})}).catch(function(s){y("status err: "+String(s?.message??s))})}catch(s){h("showStatus fail",s)}},l=function(){try{const s=I.config;s&&s.customLoadUrl&&(s.customLoadUrl.enabled=!s.customLoadUrl.enabled,s.customLoadUrl.enabled&&p.devtoolsUrl&&(s.customLoadUrl.url=p.devtoolsUrl),y("customLoadUrl: "+(s.customLoadUrl.enabled?"ON":"OFF")),n())}catch(s){h("customLoadUrl fail",s)}},d=function(){try{const s=I.config;s&&(s.loadReactDevTools=!s.loadReactDevTools,y("ReactDevTools: "+(s.loadReactDevTools?"ON":"OFF")),n())}catch(s){h("loadReactDevTools fail",s)}},S=[["tags","Tags","Bot / role tags next to usernames"],["forums","Forum Channels","Show forum & media channels"],["serverSettings","Server Settings","Full desktop settings sections"],["groupedMembers","Grouped Members","Online / offline member groups"],["contextMenu","Context Menu","Copy ID, Copy Link, dev items"],["devTools","DevTools Logger","Flux action type inspector"],["forceDesktopLayout","Desktop Layout","Force desktop CSS layout tweaks"],["recon","Recon","Component discovery diagnostic"]];return i.React.createElement(we,{style:{flex:1,backgroundColor:"#313338"}},i.React.createElement(m,{style:{padding:16,paddingBottom:8}},i.React.createElement(b,{style:{color:"#fff",fontSize:20,fontWeight:"700"}},"Same More Boats"),i.React.createElement(b,{style:{color:"#9697a0",fontSize:13,marginTop:4}},"PC features for Discord mobile")),i.React.createElement(m,{style:{height:1,backgroundColor:"#3f4147",marginHorizontal:16}}),S.map(function([s,A,ze]){return i.React.createElement(m,{key:s},i.React.createElement(H,{label:A,sublabel:ze,value:p[s],onToggle:r(s)}),i.React.createElement(m,{style:{height:1,backgroundColor:"#3f4147",marginHorizontal:16}}))}),i.React.createElement(m,{style:{padding:16,paddingTop:20}},i.React.createElement(b,{style:{color:"#fff",fontSize:16,fontWeight:"700",marginBottom:8}},"ReactDevTools"),i.React.createElement(R,{onPress:o,style:{backgroundColor:"#2b2d31",borderRadius:8,padding:14,marginBottom:10}},i.React.createElement(b,{style:{color:"#9697a0",fontSize:12}},"DevTools URL"),i.React.createElement(b,{style:{color:p.devtoolsUrl?"#dcddde":"#4f545c",fontSize:15,marginTop:4}},p.devtoolsUrl||"Tap to set URL\u2026")),i.React.createElement(R,{onPress:c,style:{backgroundColor:"#5865F2",borderRadius:8,padding:14,marginBottom:10,alignItems:"center"}},i.React.createElement(b,{style:{color:"#fff",fontSize:15,fontWeight:"600"}},"Connect DevTools")),i.React.createElement(H,{label:"Load React DevTools",sublabel:"config.loadReactDevTools",value:I.config?.loadReactDevTools,onToggle:d}),i.React.createElement(H,{label:"Custom Load URL",sublabel:"config.customLoadUrl",value:I.config?.customLoadUrl?.enabled,onToggle:l})),i.React.createElement(m,{style:{padding:16}},i.React.createElement(R,{onPress:a,style:{backgroundColor:"#2b2d31",borderRadius:8,padding:14,marginBottom:10,alignItems:"center"}},i.React.createElement(b,{style:{color:"#dcddde",fontSize:15,fontWeight:"600"}},"Status / Diagnostics")),i.React.createElement(R,{onPress:function(){try{_e()}catch{y("recon err")}},style:{backgroundColor:"#2b2d31",borderRadius:8,padding:14,marginBottom:10,alignItems:"center"}},i.React.createElement(b,{style:{color:"#dcddde",fontSize:15,fontWeight:"600"}},"Run Recon (Component Discovery)")),i.React.createElement(R,{onPress:e,style:{backgroundColor:"#4f545c",borderRadius:8,padding:14,alignItems:"center"}},i.React.createElement(b,{style:{color:"#fff",fontSize:15,fontWeight:"600"}},"Close")),i.React.createElement(m,{style:{height:30}})))}function Pe(){try{T.showCustomAlert(Oe,{close:function(){}})}catch(e){h("openSettings fail",e);try{T.showConfirmationAlert({title:"Same More Boats",content:"Settings panel failed to open. Use /smb connect <url> to connect DevTools.",confirmText:"OK",onConfirm:function(){}})}catch{}}}let C=null;function je(){if(C)return C;try{C=se.registerCommand({name:"smb",displayName:"smb",description:"Same More Boats settings & DevTools",displayDescription:"Same More Boats settings & DevTools",inputType:K.ApplicationCommandInputType.BUILT_IN,type:K.ApplicationCommandType.CHAT,applicationId:"-1",options:[{name:"action",displayName:"action",description:"open / connect / url",displayDescription:"open / connect / url",type:3,required:!1},{name:"url",displayName:"url",description:"DevTools WebSocket URL",displayDescription:"DevTools WebSocket URL",type:3,required:!1}],execute:function(e,t){try{const n=e?.find(function(o){return o.name==="action"})?.value,r=e?.find(function(o){return o.name==="url"})?.value;if(n==="connect"){const o=r||p.devtoolsUrl;return o?(p.devtoolsUrl=o,Y.connectToDebugger(o),{content:"Connecting to DevTools at "+o}):{content:"No URL set. Use `/smb url <ws://...>`"}}return n==="url"?r?(p.devtoolsUrl=r,{content:"DevTools URL saved: "+r}):{content:"Usage: `/smb url ws://192.168.x.x:8097`"}:(Pe(),{content:"Settings opened"})}catch(n){return{content:"SMB error: "+String(n?.message??n)}}}}),h("slash command /smb registered")}catch(e){h("registerCommand fail",e)}return function(){if(C){try{C()}catch{}C=null}}}const x=function(...e){try{console.log("[SMB]",...e)}catch{}};let W=[],L=null,V=!1,B=null;var Ge={onLoad(){if(V){y("Same More Boats already loaded");return}$e().then(function(){x("settings ready",JSON.stringify(p))}).catch(function(o){x("storage FAIL",o)});const e=p;let t=0,n=0;const r=function(o,c){try{const a=c();typeof a=="function"&&W.push(a),t++,x("module ok:",o)}catch(a){n++,x("module FAIL:",o,a)}};r("featureGates",function(){return Ue(e)}),r("styles",function(){L=ke(e)}),r("components",function(){return X()}),e.tags&&r("tags",function(){return Ce()}),e.forums&&r("forums",function(){return Te()}),e.serverSettings&&r("serverSettings",function(){return De()}),e.groupedMembers&&r("memberList",function(){return Ie()}),e.contextMenu&&r("contextMenu",function(){return Le()}),e.devTools&&r("devtools",function(){return Fe()});try{B=je()}catch(o){x("cmd reg fail",o)}V=!0,x(`loaded: ${t} ok, ${n} failed`),y(n===0?"Same More Boats loaded":`Same More Boats: ${t} on, ${n} skipped`)},onUnload(){if(W.forEach(function(e){try{e()}catch{}}),W=[],B){try{B()}catch{}B=null}if(L){try{L.remove()}catch{}L=null}V=!1,y("Same More Boats unloaded")}};return F.default=Ge,Object.defineProperty(F,"__esModule",{value:!0}),F})({},vendetta.patcher,vendetta.metro.common,vendetta.metro,vendetta.ui.toasts,vendetta.ui.assets,vendetta.debug,vendetta.loader,vendetta.ui.alerts,vendetta.ui.components,vendetta.storage,vendetta.commands,vendetta.constants);
+      ` : ""}
+    `;
+      (_b = (_a = document.head) == null ? void 0 : _a.appendChild) == null ? void 0 : _b.call(_a, el);
+      return el;
+    } catch {
+      return null;
+    }
+  }
+
+  // plugins/sameMoreBoats/src/index.ts
+  init_toast();
+  init_components();
+
+  // plugins/sameMoreBoats/src/modules/settings.ts
+  var import_common12 = __require("@vendetta/metro/common");
+  var import_debug = __require("@vendetta/debug");
+  var import_loader = __require("@vendetta/loader");
+  var import_alerts2 = __require("@vendetta/ui/alerts");
+  var import_components2 = __require("@vendetta/ui/components");
+  var import_storage = __require("@vendetta/storage");
+  var import_commands = __require("@vendetta/commands");
+  var import_constants = __require("@vendetta/constants");
+  init_toast();
+
+  // plugins/sameMoreBoats/src/modules/recon.ts
+  var import_metro3 = __require("@vendetta/metro");
+  var import_alerts = __require("@vendetta/ui/alerts");
+
+  // plugins/sameMoreBoats/src/modules/settings.ts
+  var log7 = (...a) => {
+    try {
+      console.log("[SMB]", ...a);
+    } catch {
+    }
+  };
+  var DEFAULTS = {
+    tags: true,
+    forums: true,
+    serverSettings: true,
+    groupedMembers: true,
+    contextMenu: true,
+    devTools: false,
+    forceDesktopLayout: false,
+    recon: false,
+    devtoolsUrl: ""
+  };
+  var settings = { ...DEFAULTS };
+  var storagePromise = null;
+  async function initStorage() {
+    if (storagePromise)
+      return storagePromise;
+    storagePromise = (async () => {
+      try {
+        const backend = (0, import_storage.createMMKVBackend)("SMBSettings");
+        const store = await (0, import_storage.createStorage)(backend);
+        const sync = (0, import_storage.wrapSync)(store);
+        settings = sync;
+        for (const k of Object.keys(DEFAULTS)) {
+          if (settings[k] === void 0 || settings[k] === null) {
+            settings[k] = DEFAULTS[k];
+          }
+        }
+        log7("storage init ok", JSON.stringify(settings));
+      } catch (e) {
+        log7("storage init FAIL", e);
+      }
+    })();
+    return storagePromise;
+  }
+  var { View: View2, Text: Text2, TextInput, ScrollView, TouchableOpacity: TouchableOpacity2 } = import_common12.ReactNative;
+  var { FormSection, FormRow, FormSwitch, FormDivider, FormLabel } = import_components2.Forms;
+  var unregCmd = null;
+  function registerSmbCommand() {
+    if (unregCmd)
+      return unregCmd;
+    try {
+      unregCmd = (0, import_commands.registerCommand)({
+        name: "smb",
+        displayName: "smb",
+        description: "Same More Boats settings & DevTools",
+        displayDescription: "Same More Boats settings & DevTools",
+        inputType: import_constants.ApplicationCommandInputType.BUILT_IN,
+        type: import_constants.ApplicationCommandType.CHAT,
+        applicationId: "-1",
+        options: [
+          {
+            name: "action",
+            displayName: "action",
+            description: "open / connect / url",
+            displayDescription: "open / connect / url",
+            type: 3,
+            required: false
+          },
+          {
+            name: "url",
+            displayName: "url",
+            description: "DevTools WebSocket URL",
+            displayDescription: "DevTools WebSocket URL",
+            type: 3,
+            required: false
+          }
+        ],
+        execute: (args, _ctx) => {
+          var _a, _b, _c;
+          try {
+            const action = (_a = args == null ? void 0 : args.find((a) => a.name === "action")) == null ? void 0 : _a.value;
+            const url = (_b = args == null ? void 0 : args.find((a) => a.name === "url")) == null ? void 0 : _b.value;
+            if (action === "connect") {
+              const u = url || settings.devtoolsUrl;
+              if (!u)
+                return { content: "No URL set. Use `/smb url <ws://...>`" };
+              settings.devtoolsUrl = u;
+              (0, import_debug.connectToDebugger)(u);
+              return { content: "Connecting to DevTools at " + u };
+            }
+            if (action === "url") {
+              if (!url)
+                return { content: "Usage: `/smb url ws://192.168.x.x:8097`" };
+              settings.devtoolsUrl = url;
+              return { content: "DevTools URL saved: " + url };
+            }
+            const lines = [
+              "**Same More Boats**",
+              "Slash commands:",
+              "`/smb connect <ws://...>` - Connect React DevTools",
+              "`/smb url <ws://192.168.x.x:8097>` - Save DevTools URL",
+              "",
+              "Status: " + (settings.devtoolsUrl ? "DevTools URL = " + settings.devtoolsUrl : "No DevTools URL set")
+            ];
+            return { content: lines.join("\n") };
+          } catch (e) {
+            return { content: "SMB error: " + String((_c = e == null ? void 0 : e.message) != null ? _c : e) };
+          }
+        }
+      });
+      log7("slash command /smb registered");
+    } catch (e) {
+      log7("registerCommand fail", e);
+    }
+    return () => {
+      if (unregCmd) {
+        try {
+          unregCmd();
+        } catch {
+        }
+        unregCmd = null;
+      }
+    };
+  }
+
+  // plugins/sameMoreBoats/src/index.ts
+  var log8 = (...a) => {
+    try {
+      console.log("[SMB]", ...a);
+    } catch {
+    }
+  };
+  var patches = [];
+  var styleEl = null;
+  var loaded = false;
+  var unregCmd2 = null;
+  var src_default = {
+    onLoad() {
+      if (loaded) {
+        toast("Same More Boats already loaded");
+        return;
+      }
+      initStorage().then(() => {
+        log8("settings ready", JSON.stringify(settings));
+      }).catch((e) => {
+        log8("storage FAIL", e);
+      });
+      const cfg = settings;
+      let ok = 0;
+      let fail = 0;
+      const safe = (name, fn) => {
+        try {
+          const un = fn();
+          if (typeof un === "function")
+            patches.push(un);
+          ok++;
+          log8("module ok:", name);
+        } catch (e) {
+          fail++;
+          log8("module FAIL:", name, e);
+        }
+      };
+      safe("featureGates", () => patchFeatureGates(cfg));
+      safe("styles", () => {
+        styleEl = injectStyles(cfg);
+      });
+      safe("components", () => patchComponents());
+      if (cfg.tags)
+        safe("tags", () => enableTags());
+      if (cfg.forums)
+        safe("forums", () => enableForums());
+      if (cfg.serverSettings)
+        safe("serverSettings", () => enableServerSettings());
+      if (cfg.groupedMembers)
+        safe("memberList", () => enableGroupedMemberList());
+      if (cfg.contextMenu)
+        safe("contextMenu", () => expandContextMenu());
+      if (cfg.devTools)
+        safe("devtools", () => enableDevTools());
+      try {
+        unregCmd2 = registerSmbCommand();
+      } catch (e) {
+        log8("cmd reg fail", e);
+      }
+      loaded = true;
+      log8(`loaded: ${ok} ok, ${fail} failed`);
+      toast(
+        fail === 0 ? "Same More Boats loaded" : `Same More Boats: ${ok} on, ${fail} skipped`
+      );
+    },
+    onUnload() {
+      patches.forEach((unpatch) => {
+        try {
+          unpatch();
+        } catch {
+        }
+      });
+      patches = [];
+      if (unregCmd2) {
+        try {
+          unregCmd2();
+        } catch {
+        }
+        unregCmd2 = null;
+      }
+      if (styleEl) {
+        try {
+          styleEl.remove();
+        } catch {
+        }
+        styleEl = null;
+      }
+      loaded = false;
+      toast("Same More Boats unloaded");
+    }
+  };
+  return __toCommonJS(src_exports);
+})();
+module.exports = __vendettaPlugin.default ?? __vendettaPlugin;

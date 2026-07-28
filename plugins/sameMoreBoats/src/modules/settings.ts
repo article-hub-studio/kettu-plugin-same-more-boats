@@ -285,8 +285,15 @@ export function registerSmbCommand(): () => void {
             settings.devtoolsUrl = url;
             return { content: "DevTools URL saved: " + url };
           }
-          openSettings();
-          return { content: "Settings opened" };
+          const lines = [
+            "**Same More Boats**",
+            "Slash commands:",
+            "`/smb connect <ws://...>` - Connect React DevTools",
+            "`/smb url <ws://192.168.x.x:8097>` - Save DevTools URL",
+            "",
+            "Status: " + (settings.devtoolsUrl ? "DevTools URL = " + settings.devtoolsUrl : "No DevTools URL set"),
+          ];
+          return { content: lines.join("\n") };
         } catch (e: any) {
           return { content: "SMB error: " + String(e?.message ?? e) };
         }

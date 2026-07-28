@@ -10,7 +10,7 @@ import { patchFeatureGates } from "./modules/featureGates";
 import { injectStyles } from "./modules/styles";
 import { toast } from "./modules/toast";
 import { patchComponents } from "./modules/components";
-import { initStorage, settings, DEFAULTS, openSettings, registerSmbCommand } from "./modules/settings";
+import { initStorage, settings, DEFAULTS, registerSmbCommand } from "./modules/settings";
 
 export type { SMBSettings } from "./modules/settings";
 
