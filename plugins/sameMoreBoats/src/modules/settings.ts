@@ -1,14 +1,4 @@
 import { React, ReactNative } from "@vendetta/metro/common";
-import { connectToDebugger } from "@vendetta/debug";
-import { config } from "@vendetta/loader";
-import { showCustomAlert, showInputAlert, showConfirmationAlert } from "@vendetta/ui/alerts";
-import { Forms, General } from "@vendetta/ui/components";
-import { getAssetIDByName } from "@vendetta/ui/assets";
-import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
-import { registerCommand } from "@vendetta/commands";
-import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
-import { toast } from "./toast";
-import { runRecon } from "./recon";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -44,6 +34,14 @@ export async function initStorage(): Promise<void> {
   if (storagePromise) return storagePromise;
   storagePromise = (async () => {
     try {
+      const storageMod: any = await import("@vendetta/storage");
+      const createMMKVBackend = storageMod.createMMKVBackend;
+      const createStorage = storageMod.createStorage;
+      const wrapSync = storageMod.wrapSync;
+      if (!createMMKVBackend || !createStorage || !wrapSync) {
+        log("storage: missing exports, using defaults");
+        return;
+      }
       const backend = createMMKVBackend("SMBSettings");
       const store = await createStorage<SMBSettings>(backend);
       const sync = wrapSync(store);
@@ -61,203 +59,43 @@ export async function initStorage(): Promise<void> {
   return storagePromise;
 }
 
-const { View, Text, TextInput, ScrollView, TouchableOpacity } = ReactNative as any;
-const { FormSection, FormRow, FormSwitch, FormDivider, FormLabel } = Forms as any;
-
-function SettingRow({ label, sublabel, value, onToggle }: any) {
-  try {
-    if (FormRow && FormSwitch) {
-      return React.createElement(FormRow, {
-        label,
-        subLabel: sublabel,
-        trailing: React.createElement(FormSwitch, { value, onValueChange: onToggle }),
-      });
-    }
-  } catch (e) { log("FormRow fail", e); }
-  return React.createElement(View, { style: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, paddingHorizontal: 16 } },
-    React.createElement(View, { style: { flex: 1 } },
-      React.createElement(Text, { style: { color: "#dcddde", fontSize: 16, fontWeight: "500" } }, label),
-      sublabel ? React.createElement(Text, { style: { color: "#9697a0", fontSize: 13, marginTop: 2 } }, sublabel) : null,
-    ),
-    React.createElement(TouchableOpacity, { onPress: () => onToggle(!value), activeOpacity: 0.7 },
-      React.createElement(View, { style: { width: 44, height: 26, borderRadius: 13, backgroundColor: value ? "#5865F2" : "#4f545c", justifyContent: "center", alignItems: value ? "flex-end" : "flex-start", paddingHorizontal: 2 } },
-        React.createElement(View, { style: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff" } }),
-      ),
-    ),
-  );
-}
-
-function SettingsPanel({ close }: any) {
-  const [, forceUpdate] = React.useState(0);
-  const rerender = () => forceUpdate((n: number) => n + 1);
-
-  const toggle = (key: keyof SMBSettings) => (val: boolean) => {
-    settings[key] = val as any;
-    try { settings[key] = val as any; } catch {}
-    rerender();
-    toast(`${key}: ${val ? "ON" : "OFF"}`);
-  };
-
-  const editUrl = () => {
-    try {
-      showInputAlert({
-        title: "ReactDevTools URL",
-        placeholder: "ws://192.168.x.x:8097",
-        initialValue: settings.devtoolsUrl || "",
-        confirmText: "Save",
-        onConfirm: (input: string) => {
-          settings.devtoolsUrl = input;
-          rerender();
-          toast("DevTools URL saved");
-        },
-      });
-    } catch (e) { log("editUrl fail", e); }
-  };
-
-  const connect = () => {
-    try {
-      const url = settings.devtoolsUrl;
-      if (!url) {
-        toast("Set a URL first");
-        editUrl();
-        return;
-      }
-      connectToDebugger(url);
-      toast("Connecting to DevTools…");
-    } catch (e) {
-      log("connect fail", e);
-      toast("Connect failed: " + String(e));
-    }
-  };
-
-  const showStatus = () => {
-    try {
-      import("./components").then((m: any) => {
-        const lines: string[] = m.getDiagnostics ? m.getDiagnostics() : ["(no diag)"];
-        showConfirmationAlert({
-          title: "SMB Status",
-          content: lines.join("\n"),
-          confirmText: "OK",
-          isDismissable: true,
-          onConfirm: () => {},
-        } as any);
-      }).catch((e: any) => {
-        toast("status err: " + String(e?.message ?? e));
-      });
-    } catch (e) { log("showStatus fail", e); }
-  };
-
-  const useCustomLoadUrl = () => {
-    try {
-      const cfg = config as any;
-      if (cfg && cfg.customLoadUrl) {
-        cfg.customLoadUrl.enabled = !cfg.customLoadUrl.enabled;
-        if (cfg.customLoadUrl.enabled && settings.devtoolsUrl) {
-          cfg.customLoadUrl.url = settings.devtoolsUrl;
-        }
-        toast("customLoadUrl: " + (cfg.customLoadUrl.enabled ? "ON" : "OFF"));
-        rerender();
-      }
-    } catch (e) { log("customLoadUrl fail", e); }
-  };
-
-  const toggleReactDevTools = () => {
-    try {
-      const cfg = config as any;
-      if (cfg) {
-        cfg.loadReactDevTools = !cfg.loadReactDevTools;
-        toast("ReactDevTools: " + (cfg.loadReactDevTools ? "ON" : "OFF"));
-        rerender();
-      }
-    } catch (e) { log("loadReactDevTools fail", e); }
-  };
-
-  const features: [keyof SMBSettings, string, string][] = [
-    ["tags", "Tags", "Bot / role tags next to usernames"],
-    ["forums", "Forum Channels", "Show forum & media channels"],
-    ["serverSettings", "Server Settings", "Full desktop settings sections"],
-    ["groupedMembers", "Grouped Members", "Online / offline member groups"],
-    ["contextMenu", "Context Menu", "Copy ID, Copy Link, dev items"],
-    ["devTools", "DevTools Logger", "Flux action type inspector"],
-    ["forceDesktopLayout", "Desktop Layout", "Force desktop CSS layout tweaks"],
-    ["recon", "Recon", "Component discovery diagnostic"],
-  ];
-
-  return React.createElement(ScrollView, { style: { flex: 1, backgroundColor: "#313338" } },
-    React.createElement(View, { style: { padding: 16, paddingBottom: 8 } },
-      React.createElement(Text, { style: { color: "#fff", fontSize: 20, fontWeight: "700" } }, "Same More Boats"),
-      React.createElement(Text, { style: { color: "#9697a0", fontSize: 13, marginTop: 4 } }, "PC features for Discord mobile"),
-    ),
-    React.createElement(View, { style: { height: 1, backgroundColor: "#3f4147", marginHorizontal: 16 } }),
-    features.map(([key, label, sub]) =>
-      React.createElement(View, { key: key },
-        React.createElement(SettingRow, { label, sublabel: sub, value: settings[key], onToggle: toggle(key) }),
-        React.createElement(View, { style: { height: 1, backgroundColor: "#3f4147", marginHorizontal: 16 } }),
-      )
-    ),
-    React.createElement(View, { style: { padding: 16, paddingTop: 20 } },
-      React.createElement(Text, { style: { color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 8 } }, "ReactDevTools"),
-      React.createElement(TouchableOpacity, { onPress: editUrl, style: { backgroundColor: "#2b2d31", borderRadius: 8, padding: 14, marginBottom: 10 } },
-        React.createElement(Text, { style: { color: "#9697a0", fontSize: 12 } }, "DevTools URL"),
-        React.createElement(Text, { style: { color: settings.devtoolsUrl ? "#dcddde" : "#4f545c", fontSize: 15, marginTop: 4 } }, settings.devtoolsUrl || "Tap to set URL…"),
-      ),
-      React.createElement(TouchableOpacity, { onPress: connect, style: { backgroundColor: "#5865F2", borderRadius: 8, padding: 14, marginBottom: 10, alignItems: "center" } },
-        React.createElement(Text, { style: { color: "#fff", fontSize: 15, fontWeight: "600" } }, "Connect DevTools"),
-      ),
-      React.createElement(SettingRow, { label: "Load React DevTools", sublabel: "config.loadReactDevTools", value: (config as any)?.loadReactDevTools, onToggle: toggleReactDevTools }),
-      React.createElement(SettingRow, { label: "Custom Load URL", sublabel: "config.customLoadUrl", value: (config as any)?.customLoadUrl?.enabled, onToggle: useCustomLoadUrl }),
-    ),
-    React.createElement(View, { style: { padding: 16 } },
-      React.createElement(TouchableOpacity, { onPress: showStatus, style: { backgroundColor: "#2b2d31", borderRadius: 8, padding: 14, marginBottom: 10, alignItems: "center" } },
-        React.createElement(Text, { style: { color: "#dcddde", fontSize: 15, fontWeight: "600" } }, "Status / Diagnostics"),
-      ),
-      React.createElement(TouchableOpacity, { onPress: () => { try { runRecon(); } catch (e) { toast("recon err"); } }, style: { backgroundColor: "#2b2d31", borderRadius: 8, padding: 14, marginBottom: 10, alignItems: "center" } },
-        React.createElement(Text, { style: { color: "#dcddde", fontSize: 15, fontWeight: "600" } }, "Run Recon (Component Discovery)"),
-      ),
-      React.createElement(TouchableOpacity, { onPress: close, style: { backgroundColor: "#4f545c", borderRadius: 8, padding: 14, alignItems: "center" } },
-        React.createElement(Text, { style: { color: "#fff", fontSize: 15, fontWeight: "600" } }, "Close"),
-      ),
-      React.createElement(View, { style: { height: 30 } }),
-    ),
-  );
-}
-
-export function openSettings(): void {
-  try {
-    showCustomAlert(SettingsPanel as any, { close: () => {} });
-  } catch (e) {
-    log("openSettings fail", e);
-    try {
-      showConfirmationAlert({
-        title: "Same More Boats",
-        content: "Settings panel failed to open. Use /smb connect <url> to connect DevTools.",
-        confirmText: "OK",
-        onConfirm: () => {},
-      });
-    } catch {}
-  }
-}
-
 let unregCmd: (() => void) | null = null;
 
 export function registerSmbCommand(): () => void {
   if (unregCmd) return unregCmd;
   try {
+    let registerCommand: any;
+    let ApplicationCommandInputType: any;
+    let ApplicationCommandType: any;
+    try {
+      const cmdMod: any = require("@vendetta/commands");
+      registerCommand = cmdMod.registerCommand;
+      const constMod: any = require("@vendetta/constants");
+      ApplicationCommandInputType = constMod.ApplicationCommandInputType;
+      ApplicationCommandType = constMod.ApplicationCommandType;
+    } catch (e) {
+      log("commands module unavailable", e);
+      return () => {};
+    }
+    if (!registerCommand) {
+      log("registerCommand not found");
+      return () => {};
+    }
     unregCmd = registerCommand({
       name: "smb",
       displayName: "smb",
-      description: "Same More Boats settings & DevTools",
-      displayDescription: "Same More Boats settings & DevTools",
-      inputType: ApplicationCommandInputType.BUILT_IN as any,
-      type: ApplicationCommandType.CHAT as any,
+      description: "Same More Boats",
+      displayDescription: "Same More Boats",
+      inputType: ApplicationCommandInputType?.BUILT_IN ?? 0,
+      type: ApplicationCommandType?.CHAT ?? 1,
       applicationId: "-1",
       options: [
         {
           name: "action",
           displayName: "action",
-          description: "open / connect / url",
-          displayDescription: "open / connect / url",
-          type: 3 as any,
+          description: "connect / url / status",
+          displayDescription: "connect / url / status",
+          type: 3,
           required: false,
         },
         {
@@ -265,11 +103,11 @@ export function registerSmbCommand(): () => void {
           displayName: "url",
           description: "DevTools WebSocket URL",
           displayDescription: "DevTools WebSocket URL",
-          type: 3 as any,
+          type: 3,
           required: false,
         },
       ],
-      execute: (args: any[], _ctx: any) => {
+      execute: async (args: any[], _ctx: any) => {
         try {
           const action = args?.find((a) => a.name === "action")?.value;
           const url = args?.find((a) => a.name === "url")?.value;
@@ -277,7 +115,10 @@ export function registerSmbCommand(): () => void {
             const u = url || settings.devtoolsUrl;
             if (!u) return { content: "No URL set. Use `/smb url <ws://...>`" };
             settings.devtoolsUrl = u;
-            connectToDebugger(u);
+            try {
+              const debugMod: any = await import("@vendetta/debug");
+              if (debugMod.connectToDebugger) debugMod.connectToDebugger(u);
+            } catch (e) { log("connect fail", e); }
             return { content: "Connecting to DevTools at " + u };
           }
           if (action === "url") {
@@ -285,13 +126,25 @@ export function registerSmbCommand(): () => void {
             settings.devtoolsUrl = url;
             return { content: "DevTools URL saved: " + url };
           }
+          if (action === "status") {
+            const lines: string[] = [];
+            try {
+              const compMod: any = await import("./components");
+              if (compMod.getDiagnostics) lines.push(...compMod.getDiagnostics());
+            } catch {}
+            lines.push("");
+            lines.push("DevTools URL: " + (settings.devtoolsUrl || "(none)"));
+            return { content: lines.join("\n") };
+          }
           const lines = [
             "**Same More Boats**",
-            "Slash commands:",
-            "`/smb connect <ws://...>` - Connect React DevTools",
-            "`/smb url <ws://192.168.x.x:8097>` - Save DevTools URL",
             "",
-            "Status: " + (settings.devtoolsUrl ? "DevTools URL = " + settings.devtoolsUrl : "No DevTools URL set"),
+            "Commands:",
+            "`/smb connect <ws://...>` — Connect React DevTools",
+            "`/smb url <ws://...>` — Save DevTools URL",
+            "`/smb status` — Show diagnostics",
+            "",
+            "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];
           return { content: lines.join("\n") };
         } catch (e: any) {

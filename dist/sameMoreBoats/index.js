@@ -1,8 +1,10 @@
 "use strict";
 var __vendettaPlugin = (() => {
+  var __create = Object.create;
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
     get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
@@ -26,13 +28,22 @@ var __vendettaPlugin = (() => {
     }
     return to;
   };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
   // plugins/sameMoreBoats/src/modules/clipboard.ts
   function copyText(text) {
     var _a, _b;
     try {
-      const c = import_common.clipboard;
+      const common = __require("@vendetta/metro/common");
+      const c = common.clipboard;
       if (c && typeof c.setString === "function") {
         c.setString(text);
         return true;
@@ -46,10 +57,11 @@ var __vendettaPlugin = (() => {
         return true;
       }
     } catch (e) {
-      log("clipboard v1 FAIL", e);
+      log("clipboard common FAIL", e);
     }
     try {
-      const rnClip = import_common2.ReactNative.Clipboard;
+      const rn = __require("@vendetta/metro/common").ReactNative;
+      const rnClip = (rn == null ? void 0 : rn.Clipboard) || (rn == null ? void 0 : rn.ExpoClipboard);
       if (rnClip == null ? void 0 : rnClip.setString) {
         rnClip.setString(text);
         return true;
@@ -62,21 +74,14 @@ var __vendettaPlugin = (() => {
       log("clipboard RN FAIL", e);
     }
     try {
-      const mod = (0, import_metro.findByProps)("setString", "getString");
+      const metro = __require("@vendetta/metro");
+      const mod = (_b = metro.findByProps) == null ? void 0 : _b.call(metro, "setString", "getString");
       if (mod == null ? void 0 : mod.setString) {
         mod.setString(text);
         return true;
       }
     } catch (e) {
       log("clipboard metro FAIL", e);
-    }
-    try {
-      const mod = (0, import_metro.findByProps)("Clipboard");
-      if ((_b = mod == null ? void 0 : mod.Clipboard) == null ? void 0 : _b.setString) {
-        mod.Clipboard.setString(text);
-        return true;
-      }
-    } catch {
     }
     try {
       const el = document.createElement("textarea");
@@ -92,13 +97,10 @@ var __vendettaPlugin = (() => {
     }
     return false;
   }
-  var import_common, import_common2, import_metro, log;
+  var log;
   var init_clipboard = __esm({
     "plugins/sameMoreBoats/src/modules/clipboard.ts"() {
       "use strict";
-      import_common = __require("@vendetta/metro/common");
-      import_common2 = __require("@vendetta/metro/common");
-      import_metro = __require("@vendetta/metro");
       log = (...a) => {
         try {
           console.log("[SMB]", ...a);
@@ -109,48 +111,55 @@ var __vendettaPlugin = (() => {
   });
 
   // plugins/sameMoreBoats/src/modules/toast.ts
-  function safeIcon() {
-    const ids = ["ic_desktop_24px", "ic_settings_24px", "ic_compose_24px", "ic_emoji_24px", "ic_information_24px"];
-    for (const n of ids) {
-      try {
-        const i = (0, import_assets.getAssetIDByName)(n);
-        if (i)
-          return i;
-      } catch {
-      }
-    }
-    return void 0;
-  }
-  function metroToast(msg) {
+  function toast(msg) {
+    var _a;
     try {
-      const t = import_common3.toasts;
+      console.log("[SMB toast]", msg);
+    } catch {
+    }
+    try {
+      const metroMod = __require("@vendetta/metro/common");
+      const t = metroMod.toasts;
       if (t && typeof t.open === "function") {
-        t.open(msg, safeIcon());
+        t.open(msg, void 0);
         return;
       }
       if (t && typeof t.showToast === "function") {
-        t.showToast(msg, safeIcon());
+        t.showToast(msg, void 0);
         return;
       }
     } catch (e) {
       log2("metroToast FAIL", e);
     }
     try {
-      (0, import_toasts.showToast)(msg, safeIcon());
+      const uiToasts = __require("@vendetta/ui/toasts");
+      const showToast = uiToasts.showToast || ((_a = uiToasts.default) == null ? void 0 : _a.showToast);
+      let iconId;
+      try {
+        const assets = __require("@vendetta/ui/assets");
+        if (assets.getAssetIDByName) {
+          for (const n of ["ic_desktop_24px", "ic_information_24px", "ic_settings_24px"]) {
+            const id = assets.getAssetIDByName(n);
+            if (id) {
+              iconId = id;
+              break;
+            }
+          }
+        }
+      } catch {
+      }
+      if (showToast) {
+        showToast(msg, iconId);
+        return;
+      }
     } catch (e) {
-      log2("vendettaToast FAIL", e);
+      log2("uiToast FAIL", e);
     }
   }
-  function toast(msg) {
-    metroToast(msg);
-  }
-  var import_common3, import_toasts, import_assets, log2;
+  var log2;
   var init_toast = __esm({
     "plugins/sameMoreBoats/src/modules/toast.ts"() {
       "use strict";
-      import_common3 = __require("@vendetta/metro/common");
-      import_toasts = __require("@vendetta/ui/toasts");
-      import_assets = __require("@vendetta/ui/assets");
       log2 = (...a) => {
         try {
           console.log("[SMB]", ...a);
@@ -161,6 +170,12 @@ var __vendettaPlugin = (() => {
   });
 
   // plugins/sameMoreBoats/src/modules/components.ts
+  var components_exports = {};
+  __export(components_exports, {
+    getDiagnostics: () => getDiagnostics,
+    patchComponents: () => patchComponents,
+    refreshRoleCache: () => refreshRoleCache
+  });
   function refreshRoles(guildId, roles) {
     if (!guildId || !Array.isArray(roles))
       return;
@@ -181,7 +196,7 @@ var __vendettaPlugin = (() => {
     return (_b = (_a = roleCache.get(guildId)) == null ? void 0 : _a.get(roleId)) != null ? _b : null;
   }
   function BotTagPill({ text, color }) {
-    return import_common4.React.createElement(
+    return import_common.React.createElement(
       View,
       {
         style: {
@@ -193,7 +208,7 @@ var __vendettaPlugin = (() => {
           alignSelf: "center"
         }
       },
-      import_common4.React.createElement(
+      import_common.React.createElement(
         Text,
         { style: { color: "#fff", fontSize: 10, fontWeight: "700", textTransform: "uppercase" } },
         text
@@ -243,10 +258,10 @@ var __vendettaPlugin = (() => {
     return tags;
   }
   function tagsRow(tags) {
-    return import_common4.React.createElement(
+    return import_common.React.createElement(
       View,
       { style: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" } },
-      ...tags.map((t, i) => import_common4.React.createElement(BotTagPill, { key: i, text: t.text, color: t.color }))
+      ...tags.map((t, i) => import_common.React.createElement(BotTagPill, { key: i, text: t.text, color: t.color }))
     );
   }
   function safeFind(label, fn) {
@@ -269,22 +284,22 @@ var __vendettaPlugin = (() => {
     };
     const names = ["Nameplate", "NameplateInner", "Username", "MessageAuthor", "BotTag", "BotTagRegular", "AuthorTag", "RoleIcon", "PillWrapper", "ButtonPill"];
     for (const n of names) {
-      add(safeFind("name:" + n, () => (0, import_metro2.findByName)(n, false)));
-      const all = safeFind("nameAll:" + n, () => (0, import_metro2.findByNameAll)(n, false));
+      add(safeFind("name:" + n, () => (0, import_metro.findByName)(n, false)));
+      const all = safeFind("nameAll:" + n, () => (0, import_metro.findByNameAll)(n, false));
       if (Array.isArray(all))
         for (const x of all)
           add(x);
-      add(safeFind("dn:" + n, () => (0, import_metro2.findByDisplayName)(n, false)));
-      const dall = safeFind("dnAll:" + n, () => (0, import_metro2.findByDisplayNameAll)(n, false));
+      add(safeFind("dn:" + n, () => (0, import_metro.findByDisplayName)(n, false)));
+      const dall = safeFind("dnAll:" + n, () => (0, import_metro.findByDisplayNameAll)(n, false));
       if (Array.isArray(dall))
         for (const x of dall)
           add(x);
       const p = safeFind("props:" + n, () => {
-        const m = (0, import_metro2.findByProps)(n);
+        const m = (0, import_metro.findByProps)(n);
         return m ? m[n] : null;
       });
       add(p);
-      const filterFound = safeFind("filter:" + n, () => (0, import_metro2.find)((m) => {
+      const filterFound = safeFind("filter:" + n, () => (0, import_metro.find)((m) => {
         if (typeof m === "function" && (m.displayName === n || m.name === n))
           return true;
         if (m && typeof m === "object") {
@@ -307,7 +322,7 @@ var __vendettaPlugin = (() => {
     if (!tags.length || !ret)
       return ret;
     try {
-      if (!import_common4.React.isValidElement(ret))
+      if (!import_common.React.isValidElement(ret))
         return ret;
       const injected = tagsRow(tags);
       const props = { ...ret.props || {} };
@@ -319,7 +334,7 @@ var __vendettaPlugin = (() => {
       } else {
         props.children = [children, injected];
       }
-      return import_common4.React.cloneElement(ret, props);
+      return import_common.React.cloneElement(ret, props);
     } catch (e) {
       log3("injectTags FAIL", e);
       return ret;
@@ -475,7 +490,7 @@ var __vendettaPlugin = (() => {
     let targetMod = null;
     let targetFnName = null;
     for (const k of finderKeys) {
-      const mod = safeFind("ctx:" + k, () => (0, import_metro2.findByProps)(k));
+      const mod = safeFind("ctx:" + k, () => (0, import_metro.findByProps)(k));
       if (mod && typeof mod[k] === "function") {
         targetMod = mod;
         targetFnName = k;
@@ -484,7 +499,7 @@ var __vendettaPlugin = (() => {
     }
     if (!targetMod || !targetFnName) {
       try {
-        const mod = (0, import_metro2.find)((m) => {
+        const mod = (0, import_metro.find)((m) => {
           if (!m || typeof m !== "object")
             return false;
           for (const k of Object.keys(m)) {
@@ -594,7 +609,7 @@ var __vendettaPlugin = (() => {
   function patchDeveloperMode() {
     var _a;
     try {
-      const store = safeFind("DeveloperModeStore", () => (0, import_metro2.findByStoreName)("DeveloperModeStore"));
+      const store = safeFind("DeveloperModeStore", () => (0, import_metro.findByStoreName)("DeveloperModeStore"));
       if (!store) {
         log3("DeveloperModeStore not found");
         return;
@@ -615,6 +630,37 @@ var __vendettaPlugin = (() => {
     } catch (e) {
       log3("patchDeveloperMode FAIL", e);
     }
+  }
+  function diagnostics() {
+    const out = [];
+    const checks = [
+      ["nameplate.comps", () => findNameplateComponents().length],
+      ["ctxMenu.builder", () => (0, import_metro.findByProps)("buildMessageContextMenuItems")],
+      ["ctxMenu.items", () => (0, import_metro.findByProps)("menuItems")],
+      ["ctxMenu.open", () => (0, import_metro.findByProps)("openContextMenu")],
+      ["ctxMenu.container", () => (0, import_metro.findByProps)("ContextMenuContainer")],
+      ["nameplate", () => (0, import_metro.findByName)("Nameplate", false)],
+      ["nameplateInner", () => (0, import_metro.findByName)("NameplateInner", false)],
+      ["username", () => (0, import_metro.findByName)("Username", false)],
+      ["botTag", () => (0, import_metro.findByName)("BotTag", false)],
+      ["GuildStore", () => (0, import_metro.findByStoreName)("GuildStore")],
+      ["GuildMemberStore", () => (0, import_metro.findByStoreName)("GuildMemberStore")],
+      ["RoleStore", () => (0, import_metro.findByStoreName)("RoleStore")],
+      ["DeveloperModeStore", () => (0, import_metro.findByStoreName)("DeveloperModeStore")],
+      ["clipboard", () => (0, import_metro.findByProps)("setString")]
+    ];
+    for (const [label, fn] of checks) {
+      try {
+        const r = fn();
+        out.push(`${label}: ${r ? "FOUND" : "miss"}`);
+      } catch {
+        out.push(`${label}: ERR`);
+      }
+    }
+    return out;
+  }
+  function getDiagnostics() {
+    return diagnostics();
   }
   function patchComponents() {
     const un = [];
@@ -638,12 +684,12 @@ var __vendettaPlugin = (() => {
       }
     });
   }
-  var import_common4, import_metro2, import_patcher, log3, View, Text, TouchableOpacity, roleCache;
+  var import_common, import_metro, import_patcher, log3, View, Text, TouchableOpacity, roleCache;
   var init_components = __esm({
     "plugins/sameMoreBoats/src/modules/components.ts"() {
       "use strict";
-      import_common4 = __require("@vendetta/metro/common");
-      import_metro2 = __require("@vendetta/metro");
+      import_common = __require("@vendetta/metro/common");
+      import_metro = __require("@vendetta/metro");
       import_patcher = __require("@vendetta/patcher");
       init_clipboard();
       init_toast();
@@ -653,302 +699,16 @@ var __vendettaPlugin = (() => {
         } catch {
         }
       };
-      ({ View, Text, TouchableOpacity } = import_common4.ReactNative);
+      ({ View, Text, TouchableOpacity } = import_common.ReactNative);
       roleCache = /* @__PURE__ */ new Map();
     }
   });
 
-  // plugins/sameMoreBoats/src/index.ts
-  var src_exports = {};
-  __export(src_exports, {
-    default: () => src_default
-  });
-
-  // plugins/sameMoreBoats/src/modules/tags.ts
-  var import_patcher2 = __require("@vendetta/patcher");
-  var import_common5 = __require("@vendetta/metro/common");
-  init_components();
-  var log4 = (...a) => {
-    try {
-      console.log("[SMB]", ...a);
-    } catch {
-    }
-  };
-  function harvestRoles(obj, depth = 0) {
-    if (!obj || typeof obj !== "object" || depth > 6)
-      return;
-    if (Array.isArray(obj)) {
-      for (const x of obj)
-        harvestRoles(x, depth + 1);
-      return;
-    }
-    if (obj.guildId && Array.isArray(obj.roles))
-      refreshRoleCache(obj.guildId, obj.roles);
-    if (obj.id && Array.isArray(obj.roles))
-      refreshRoleCache(obj.id, obj.roles);
-    if (obj.guild && obj.guild.id && Array.isArray(obj.guild.roles))
-      refreshRoleCache(obj.guild.id, obj.guild.roles);
-    if (Array.isArray(obj.guilds)) {
-      for (const g of obj.guilds)
-        if ((g == null ? void 0 : g.id) && Array.isArray(g.roles))
-          refreshRoleCache(g.id, g.roles);
-    }
-    for (const k of Object.keys(obj)) {
-      if (k === "roles" || k === "guild" || k === "guilds")
-        continue;
-      const v = obj[k];
-      if (v && typeof v === "object")
-        harvestRoles(v, depth + 1);
-    }
-  }
-  function enableTags() {
-    const unpatches = [];
-    unpatches.push(
-      (0, import_patcher2.before)("dispatch", import_common5.FluxDispatcher, (args) => {
-        try {
-          harvestRoles(args == null ? void 0 : args[0]);
-        } catch {
-        }
-      })
-    );
-    log4("tags: role-cache feeder active");
-    return () => unpatches.forEach((u) => {
-      try {
-        u();
-      } catch {
-      }
-    });
-  }
-
-  // plugins/sameMoreBoats/src/modules/forums.ts
-  var import_patcher3 = __require("@vendetta/patcher");
-  var import_common6 = __require("@vendetta/metro/common");
-  var FORUM = 15;
-  var MEDIA = 16;
-  var stamp = (ch) => {
-    if (!ch || ch.__smbType)
-      return;
-    if (ch.type === FORUM || ch.type === MEDIA) {
-      try {
-        Object.defineProperty(ch, "__smbType", { value: ch.type, enumerable: false, configurable: true });
-      } catch {
-      }
-    }
-  };
-  function enableForums() {
-    const unpatches = [];
-    unpatches.push(
-      (0, import_patcher3.before)("dispatch", import_common6.FluxDispatcher, (args) => {
-        const action = args == null ? void 0 : args[0];
-        if (!action)
-          return;
-        if (action.channel)
-          stamp(action.channel);
-        if (Array.isArray(action.channels))
-          action.channels.forEach(stamp);
-        if (action.channelUpdates)
-          Object.values(action.channelUpdates).forEach(stamp);
-        if (action.guild && Array.isArray(action.guild.channels))
-          action.guild.channels.forEach(stamp);
-        if (Array.isArray(action.guilds)) {
-          for (const g of action.guilds)
-            if (g && Array.isArray(g.channels))
-              g.channels.forEach(stamp);
-        }
-      })
-    );
-    unpatches.push(
-      (0, import_patcher3.before)("dispatch", import_common6.FluxDispatcher, (args) => {
-        var _a;
-        const action = args == null ? void 0 : args[0];
-        if ((action == null ? void 0 : action.type) === "FETCH_CHANNEL_INFO" && ((_a = action.channel) == null ? void 0 : _a.type) === FORUM) {
-          try {
-            import_common6.FluxDispatcher.dispatch({
-              type: "LOAD_MESSAGES",
-              channelId: action.channel.id
-            });
-          } catch {
-          }
-        }
-      })
-    );
-    return () => unpatches.forEach((u) => {
-      try {
-        u();
-      } catch {
-      }
-    });
-  }
-
-  // plugins/sameMoreBoats/src/modules/serverSettings.ts
-  var import_patcher4 = __require("@vendetta/patcher");
-  var import_common7 = __require("@vendetta/metro/common");
-  var FULL_SECTIONS = [
-    { key: "overview", label: "Overview" },
-    { key: "roles", label: "Roles" },
-    { key: "emoji", label: "Emoji" },
-    { key: "stickers", label: "Stickers" },
-    { key: "widget", label: "Widget" },
-    { key: "automod", label: "AutoMod" },
-    { key: "onboarding", label: "Onboarding" },
-    { key: "incidents", label: "Incidents" },
-    { key: "audit_log", label: "Audit Log" },
-    { key: "members", label: "Members" },
-    { key: "bans", label: "Bans" },
-    { key: "integrations", label: "Integrations" },
-    { key: "delete", label: "Delete Server" }
-  ];
-  function enableServerSettings() {
-    const unpatches = [];
-    unpatches.push(
-      (0, import_patcher4.before)("dispatch", import_common7.FluxDispatcher, (args) => {
-        const action = args == null ? void 0 : args[0];
-        if (!(action == null ? void 0 : action.type))
-          return;
-        const t = action.type;
-        if (/GUILD.*SETTINGS|SETTINGS.*OPEN|GUILD.*CONFIG/i.test(t)) {
-          if (!Array.isArray(action.sections) || action.sections.length < FULL_SECTIONS.length) {
-            action.sections = FULL_SECTIONS;
-          }
-        }
-      })
-    );
-    return () => unpatches.forEach((u) => {
-      try {
-        u();
-      } catch {
-      }
-    });
-  }
-
-  // plugins/sameMoreBoats/src/modules/memberList.ts
-  var import_patcher5 = __require("@vendetta/patcher");
-  var import_common8 = __require("@vendetta/metro/common");
-  function buildGroups(members) {
-    const online = members.filter((m) => (m == null ? void 0 : m.status) !== "offline");
-    const offline = members.filter((m) => (m == null ? void 0 : m.status) === "offline");
-    const groups = [
-      { id: "online", label: "Online", count: online.length, collapsed: false }
-    ];
-    if (offline.length)
-      groups.push({ id: "offline", label: "Offline", count: offline.length, collapsed: true });
-    return groups;
-  }
-  function enableGroupedMemberList() {
-    const unpatches = [];
-    unpatches.push(
-      (0, import_patcher5.before)("dispatch", import_common8.FluxDispatcher, (args) => {
-        const action = args == null ? void 0 : args[0];
-        if (!action)
-          return;
-        let members = null;
-        if (Array.isArray(action.members))
-          members = action.members;
-        else if (action.member)
-          members = [action.member];
-        if (members && members.length) {
-          action.__smbGroups = buildGroups(members);
-          action.__smbGrouped = true;
-        }
-      })
-    );
-    return () => unpatches.forEach((u) => {
-      try {
-        u();
-      } catch {
-      }
-    });
-  }
-
-  // plugins/sameMoreBoats/src/modules/contextMenu.ts
-  var import_patcher6 = __require("@vendetta/patcher");
-  var import_common9 = __require("@vendetta/metro/common");
-  var log5 = (...a) => {
-    try {
-      console.log("[SMB]", ...a);
-    } catch {
-    }
-  };
-  function expandContextMenu() {
-    const un = [];
-    un.push(
-      (0, import_patcher6.before)("dispatch", import_common9.FluxDispatcher, (args) => {
-        try {
-          const a = args == null ? void 0 : args[0];
-          if (!(a == null ? void 0 : a.type))
-            return;
-          if (/MESSAGE|CHANNEL|CONTEXT/i.test(a.type)) {
-            log5("ctx observe:", a.type);
-          }
-        } catch {
-        }
-      })
-    );
-    log5("contextMenu: observer active (render in components.ts)");
-    return () => un.forEach((u) => {
-      try {
-        u();
-      } catch {
-      }
-    });
-  }
-
-  // plugins/sameMoreBoats/src/modules/devtools.ts
-  var import_patcher7 = __require("@vendetta/patcher");
-  var import_common10 = __require("@vendetta/metro/common");
-  init_toast();
-  var log6 = (...a) => {
-    try {
-      console.log("[SMB]", ...a);
-    } catch {
-    }
-  };
-  function enableDevTools() {
-    const unpatches = [];
-    let buffer2 = [];
-    let count = 0;
-    unpatches.push(
-      (0, import_patcher7.before)("dispatch", import_common10.FluxDispatcher, (args) => {
-        const a = args == null ? void 0 : args[0];
-        if (a == null ? void 0 : a.type) {
-          buffer2.push(a.type);
-          if (buffer2.length > 200)
-            buffer2.shift();
-          count++;
-        }
-      })
-    );
-    toast("DevTools logger active \u2014 actions logged to console");
-    log6("DevTools: listening to FluxDispatcher. Total captured:", count);
-    return () => unpatches.forEach((u) => {
-      try {
-        u();
-      } catch {
-      }
-    });
-  }
-
   // plugins/sameMoreBoats/src/modules/featureGates.ts
-  var import_patcher8 = __require("@vendetta/patcher");
-  var import_common11 = __require("@vendetta/metro/common");
-  var PC_GATES = [
-    "guild_tags",
-    "role_tags",
-    "forum_channels",
-    "forum_search",
-    "guidelines_screen",
-    "member_list_grouping",
-    "server_guide",
-    "onboarding",
-    "community_guild_settings_v2",
-    "role_icon_upload",
-    "guild_role_subscriptions",
-    "auto_mod",
-    "guild_incidents",
-    "member_verification",
-    "developer_mode",
-    "dev_tools"
-  ];
+  var featureGates_exports = {};
+  __export(featureGates_exports, {
+    patchFeatureGates: () => patchFeatureGates
+  });
   function addGates(features) {
     if (!Array.isArray(features))
       return false;
@@ -989,7 +749,7 @@ var __vendettaPlugin = (() => {
   function patchFeatureGates(_cfg) {
     const unpatches = [];
     unpatches.push(
-      (0, import_patcher8.before)("dispatch", import_common11.FluxDispatcher, (args) => {
+      (0, import_patcher2.before)("dispatch", import_common2.FluxDispatcher, (args) => {
         try {
           harvest(args == null ? void 0 : args[0]);
         } catch {
@@ -1003,8 +763,366 @@ var __vendettaPlugin = (() => {
       }
     });
   }
+  var import_patcher2, import_common2, PC_GATES;
+  var init_featureGates = __esm({
+    "plugins/sameMoreBoats/src/modules/featureGates.ts"() {
+      "use strict";
+      import_patcher2 = __require("@vendetta/patcher");
+      import_common2 = __require("@vendetta/metro/common");
+      PC_GATES = [
+        "guild_tags",
+        "role_tags",
+        "forum_channels",
+        "forum_search",
+        "guidelines_screen",
+        "member_list_grouping",
+        "server_guide",
+        "onboarding",
+        "community_guild_settings_v2",
+        "role_icon_upload",
+        "guild_role_subscriptions",
+        "auto_mod",
+        "guild_incidents",
+        "member_verification",
+        "developer_mode",
+        "dev_tools"
+      ];
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/tags.ts
+  var tags_exports = {};
+  __export(tags_exports, {
+    enableTags: () => enableTags
+  });
+  function harvestRoles(obj, depth = 0) {
+    if (!obj || typeof obj !== "object" || depth > 6)
+      return;
+    if (Array.isArray(obj)) {
+      for (const x of obj)
+        harvestRoles(x, depth + 1);
+      return;
+    }
+    if (obj.guildId && Array.isArray(obj.roles))
+      refreshRoleCache(obj.guildId, obj.roles);
+    if (obj.id && Array.isArray(obj.roles))
+      refreshRoleCache(obj.id, obj.roles);
+    if (obj.guild && obj.guild.id && Array.isArray(obj.guild.roles))
+      refreshRoleCache(obj.guild.id, obj.guild.roles);
+    if (Array.isArray(obj.guilds)) {
+      for (const g of obj.guilds)
+        if ((g == null ? void 0 : g.id) && Array.isArray(g.roles))
+          refreshRoleCache(g.id, g.roles);
+    }
+    for (const k of Object.keys(obj)) {
+      if (k === "roles" || k === "guild" || k === "guilds")
+        continue;
+      const v = obj[k];
+      if (v && typeof v === "object")
+        harvestRoles(v, depth + 1);
+    }
+  }
+  function enableTags() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher3.before)("dispatch", import_common3.FluxDispatcher, (args) => {
+        try {
+          harvestRoles(args == null ? void 0 : args[0]);
+        } catch {
+        }
+      })
+    );
+    log5("tags: role-cache feeder active");
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  var import_patcher3, import_common3, log5;
+  var init_tags = __esm({
+    "plugins/sameMoreBoats/src/modules/tags.ts"() {
+      "use strict";
+      import_patcher3 = __require("@vendetta/patcher");
+      import_common3 = __require("@vendetta/metro/common");
+      init_components();
+      log5 = (...a) => {
+        try {
+          console.log("[SMB]", ...a);
+        } catch {
+        }
+      };
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/forums.ts
+  var forums_exports = {};
+  __export(forums_exports, {
+    enableForums: () => enableForums
+  });
+  function enableForums() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher4.before)("dispatch", import_common4.FluxDispatcher, (args) => {
+        const action = args == null ? void 0 : args[0];
+        if (!action)
+          return;
+        if (action.channel)
+          stamp(action.channel);
+        if (Array.isArray(action.channels))
+          action.channels.forEach(stamp);
+        if (action.channelUpdates)
+          Object.values(action.channelUpdates).forEach(stamp);
+        if (action.guild && Array.isArray(action.guild.channels))
+          action.guild.channels.forEach(stamp);
+        if (Array.isArray(action.guilds)) {
+          for (const g of action.guilds)
+            if (g && Array.isArray(g.channels))
+              g.channels.forEach(stamp);
+        }
+      })
+    );
+    unpatches.push(
+      (0, import_patcher4.before)("dispatch", import_common4.FluxDispatcher, (args) => {
+        var _a;
+        const action = args == null ? void 0 : args[0];
+        if ((action == null ? void 0 : action.type) === "FETCH_CHANNEL_INFO" && ((_a = action.channel) == null ? void 0 : _a.type) === FORUM) {
+          try {
+            import_common4.FluxDispatcher.dispatch({
+              type: "LOAD_MESSAGES",
+              channelId: action.channel.id
+            });
+          } catch {
+          }
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  var import_patcher4, import_common4, FORUM, MEDIA, stamp;
+  var init_forums = __esm({
+    "plugins/sameMoreBoats/src/modules/forums.ts"() {
+      "use strict";
+      import_patcher4 = __require("@vendetta/patcher");
+      import_common4 = __require("@vendetta/metro/common");
+      FORUM = 15;
+      MEDIA = 16;
+      stamp = (ch) => {
+        if (!ch || ch.__smbType)
+          return;
+        if (ch.type === FORUM || ch.type === MEDIA) {
+          try {
+            Object.defineProperty(ch, "__smbType", { value: ch.type, enumerable: false, configurable: true });
+          } catch {
+          }
+        }
+      };
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/serverSettings.ts
+  var serverSettings_exports = {};
+  __export(serverSettings_exports, {
+    enableServerSettings: () => enableServerSettings
+  });
+  function enableServerSettings() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher5.before)("dispatch", import_common5.FluxDispatcher, (args) => {
+        const action = args == null ? void 0 : args[0];
+        if (!(action == null ? void 0 : action.type))
+          return;
+        const t = action.type;
+        if (/GUILD.*SETTINGS|SETTINGS.*OPEN|GUILD.*CONFIG/i.test(t)) {
+          if (!Array.isArray(action.sections) || action.sections.length < FULL_SECTIONS.length) {
+            action.sections = FULL_SECTIONS;
+          }
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  var import_patcher5, import_common5, FULL_SECTIONS;
+  var init_serverSettings = __esm({
+    "plugins/sameMoreBoats/src/modules/serverSettings.ts"() {
+      "use strict";
+      import_patcher5 = __require("@vendetta/patcher");
+      import_common5 = __require("@vendetta/metro/common");
+      FULL_SECTIONS = [
+        { key: "overview", label: "Overview" },
+        { key: "roles", label: "Roles" },
+        { key: "emoji", label: "Emoji" },
+        { key: "stickers", label: "Stickers" },
+        { key: "widget", label: "Widget" },
+        { key: "automod", label: "AutoMod" },
+        { key: "onboarding", label: "Onboarding" },
+        { key: "incidents", label: "Incidents" },
+        { key: "audit_log", label: "Audit Log" },
+        { key: "members", label: "Members" },
+        { key: "bans", label: "Bans" },
+        { key: "integrations", label: "Integrations" },
+        { key: "delete", label: "Delete Server" }
+      ];
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/memberList.ts
+  var memberList_exports = {};
+  __export(memberList_exports, {
+    enableGroupedMemberList: () => enableGroupedMemberList
+  });
+  function buildGroups(members) {
+    const online = members.filter((m) => (m == null ? void 0 : m.status) !== "offline");
+    const offline = members.filter((m) => (m == null ? void 0 : m.status) === "offline");
+    const groups = [
+      { id: "online", label: "Online", count: online.length, collapsed: false }
+    ];
+    if (offline.length)
+      groups.push({ id: "offline", label: "Offline", count: offline.length, collapsed: true });
+    return groups;
+  }
+  function enableGroupedMemberList() {
+    const unpatches = [];
+    unpatches.push(
+      (0, import_patcher6.before)("dispatch", import_common6.FluxDispatcher, (args) => {
+        const action = args == null ? void 0 : args[0];
+        if (!action)
+          return;
+        let members = null;
+        if (Array.isArray(action.members))
+          members = action.members;
+        else if (action.member)
+          members = [action.member];
+        if (members && members.length) {
+          action.__smbGroups = buildGroups(members);
+          action.__smbGrouped = true;
+        }
+      })
+    );
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  var import_patcher6, import_common6;
+  var init_memberList = __esm({
+    "plugins/sameMoreBoats/src/modules/memberList.ts"() {
+      "use strict";
+      import_patcher6 = __require("@vendetta/patcher");
+      import_common6 = __require("@vendetta/metro/common");
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/contextMenu.ts
+  var contextMenu_exports = {};
+  __export(contextMenu_exports, {
+    expandContextMenu: () => expandContextMenu
+  });
+  function expandContextMenu() {
+    const un = [];
+    un.push(
+      (0, import_patcher7.before)("dispatch", import_common7.FluxDispatcher, (args) => {
+        try {
+          const a = args == null ? void 0 : args[0];
+          if (!(a == null ? void 0 : a.type))
+            return;
+          if (/MESSAGE|CHANNEL|CONTEXT/i.test(a.type)) {
+            log6("ctx observe:", a.type);
+          }
+        } catch {
+        }
+      })
+    );
+    log6("contextMenu: observer active (render in components.ts)");
+    return () => un.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  var import_patcher7, import_common7, log6;
+  var init_contextMenu = __esm({
+    "plugins/sameMoreBoats/src/modules/contextMenu.ts"() {
+      "use strict";
+      import_patcher7 = __require("@vendetta/patcher");
+      import_common7 = __require("@vendetta/metro/common");
+      log6 = (...a) => {
+        try {
+          console.log("[SMB]", ...a);
+        } catch {
+        }
+      };
+    }
+  });
+
+  // plugins/sameMoreBoats/src/modules/devtools.ts
+  var devtools_exports = {};
+  __export(devtools_exports, {
+    enableDevTools: () => enableDevTools,
+    getDevToolsBuffer: () => getDevToolsBuffer
+  });
+  function enableDevTools() {
+    const unpatches = [];
+    let buffer2 = [];
+    let count = 0;
+    unpatches.push(
+      (0, import_patcher8.before)("dispatch", import_common8.FluxDispatcher, (args) => {
+        const a = args == null ? void 0 : args[0];
+        if (a == null ? void 0 : a.type) {
+          buffer2.push(a.type);
+          if (buffer2.length > 200)
+            buffer2.shift();
+          count++;
+        }
+      })
+    );
+    toast("DevTools logger active \u2014 actions logged to console");
+    log7("DevTools: listening to FluxDispatcher. Total captured:", count);
+    return () => unpatches.forEach((u) => {
+      try {
+        u();
+      } catch {
+      }
+    });
+  }
+  function getDevToolsBuffer() {
+    return buffer ? [...buffer] : [];
+  }
+  var import_patcher8, import_common8, log7;
+  var init_devtools = __esm({
+    "plugins/sameMoreBoats/src/modules/devtools.ts"() {
+      "use strict";
+      import_patcher8 = __require("@vendetta/patcher");
+      import_common8 = __require("@vendetta/metro/common");
+      init_toast();
+      log7 = (...a) => {
+        try {
+          console.log("[SMB]", ...a);
+        } catch {
+        }
+      };
+    }
+  });
 
   // plugins/sameMoreBoats/src/modules/styles.ts
+  var styles_exports = {};
+  __export(styles_exports, {
+    injectStyles: () => injectStyles
+  });
   function injectStyles(cfg) {
     var _a, _b;
     try {
@@ -1028,28 +1146,20 @@ var __vendettaPlugin = (() => {
       return null;
     }
   }
+  var init_styles = __esm({
+    "plugins/sameMoreBoats/src/modules/styles.ts"() {
+      "use strict";
+    }
+  });
 
   // plugins/sameMoreBoats/src/index.ts
-  init_toast();
-  init_components();
+  var src_exports = {};
+  __export(src_exports, {
+    default: () => src_default
+  });
 
   // plugins/sameMoreBoats/src/modules/settings.ts
-  var import_common12 = __require("@vendetta/metro/common");
-  var import_debug = __require("@vendetta/debug");
-  var import_loader = __require("@vendetta/loader");
-  var import_alerts2 = __require("@vendetta/ui/alerts");
-  var import_components2 = __require("@vendetta/ui/components");
-  var import_storage = __require("@vendetta/storage");
-  var import_commands = __require("@vendetta/commands");
-  var import_constants = __require("@vendetta/constants");
-  init_toast();
-
-  // plugins/sameMoreBoats/src/modules/recon.ts
-  var import_metro3 = __require("@vendetta/metro");
-  var import_alerts = __require("@vendetta/ui/alerts");
-
-  // plugins/sameMoreBoats/src/modules/settings.ts
-  var log7 = (...a) => {
+  var log4 = (...a) => {
     try {
       console.log("[SMB]", ...a);
     } catch {
@@ -1073,43 +1183,69 @@ var __vendettaPlugin = (() => {
       return storagePromise;
     storagePromise = (async () => {
       try {
-        const backend = (0, import_storage.createMMKVBackend)("SMBSettings");
-        const store = await (0, import_storage.createStorage)(backend);
-        const sync = (0, import_storage.wrapSync)(store);
+        const storageMod = await import("@vendetta/storage");
+        const createMMKVBackend = storageMod.createMMKVBackend;
+        const createStorage = storageMod.createStorage;
+        const wrapSync = storageMod.wrapSync;
+        if (!createMMKVBackend || !createStorage || !wrapSync) {
+          log4("storage: missing exports, using defaults");
+          return;
+        }
+        const backend = createMMKVBackend("SMBSettings");
+        const store = await createStorage(backend);
+        const sync = wrapSync(store);
         settings = sync;
         for (const k of Object.keys(DEFAULTS)) {
           if (settings[k] === void 0 || settings[k] === null) {
             settings[k] = DEFAULTS[k];
           }
         }
-        log7("storage init ok", JSON.stringify(settings));
+        log4("storage init ok", JSON.stringify(settings));
       } catch (e) {
-        log7("storage init FAIL", e);
+        log4("storage init FAIL", e);
       }
     })();
     return storagePromise;
   }
-  var { View: View2, Text: Text2, TextInput, ScrollView, TouchableOpacity: TouchableOpacity2 } = import_common12.ReactNative;
-  var { FormSection, FormRow, FormSwitch, FormDivider, FormLabel } = import_components2.Forms;
   var unregCmd = null;
   function registerSmbCommand() {
+    var _a, _b;
     if (unregCmd)
       return unregCmd;
     try {
-      unregCmd = (0, import_commands.registerCommand)({
+      let registerCommand;
+      let ApplicationCommandInputType;
+      let ApplicationCommandType;
+      try {
+        const cmdMod = __require("@vendetta/commands");
+        registerCommand = cmdMod.registerCommand;
+        const constMod = __require("@vendetta/constants");
+        ApplicationCommandInputType = constMod.ApplicationCommandInputType;
+        ApplicationCommandType = constMod.ApplicationCommandType;
+      } catch (e) {
+        log4("commands module unavailable", e);
+        return () => {
+        };
+      }
+      if (!registerCommand) {
+        log4("registerCommand not found");
+        return () => {
+        };
+      }
+      unregCmd = registerCommand({
         name: "smb",
         displayName: "smb",
-        description: "Same More Boats settings & DevTools",
-        displayDescription: "Same More Boats settings & DevTools",
-        inputType: import_constants.ApplicationCommandInputType.BUILT_IN,
-        type: import_constants.ApplicationCommandType.CHAT,
+        description: "Same More Boats",
+        displayDescription: "Same More Boats",
+        inputType: (_a = ApplicationCommandInputType == null ? void 0 : ApplicationCommandInputType.BUILT_IN) != null ? _a : 0,
+        type: (_b = ApplicationCommandType == null ? void 0 : ApplicationCommandType.CHAT) != null ? _b : 1,
         applicationId: "-1",
         options: [
           {
             name: "action",
             displayName: "action",
-            description: "open / connect / url",
-            displayDescription: "open / connect / url",
+            description: "connect / url / status",
+            displayDescription: "connect / url / status",
             type: 3,
             required: false
           },
@@ -1122,17 +1258,23 @@ var __vendettaPlugin = (() => {
             required: false
           }
         ],
-        execute: (args, _ctx) => {
-          var _a, _b, _c;
+        execute: async (args, _ctx) => {
+          var _a2, _b2, _c;
           try {
-            const action = (_a = args == null ? void 0 : args.find((a) => a.name === "action")) == null ? void 0 : _a.value;
-            const url = (_b = args == null ? void 0 : args.find((a) => a.name === "url")) == null ? void 0 : _b.value;
+            const action = (_a2 = args == null ? void 0 : args.find((a) => a.name === "action")) == null ? void 0 : _a2.value;
+            const url = (_b2 = args == null ? void 0 : args.find((a) => a.name === "url")) == null ? void 0 : _b2.value;
             if (action === "connect") {
               const u = url || settings.devtoolsUrl;
               if (!u)
                 return { content: "No URL set. Use `/smb url <ws://...>`" };
               settings.devtoolsUrl = u;
-              (0, import_debug.connectToDebugger)(u);
+              try {
+                const debugMod = await import("@vendetta/debug");
+                if (debugMod.connectToDebugger)
+                  debugMod.connectToDebugger(u);
+              } catch (e) {
+                log4("connect fail", e);
+              }
               return { content: "Connecting to DevTools at " + u };
             }
             if (action === "url") {
@@ -1141,13 +1283,27 @@ var __vendettaPlugin = (() => {
               settings.devtoolsUrl = url;
               return { content: "DevTools URL saved: " + url };
             }
+            if (action === "status") {
+              const lines2 = [];
+              try {
+                const compMod = await Promise.resolve().then(() => (init_components(), components_exports));
+                if (compMod.getDiagnostics)
+                  lines2.push(...compMod.getDiagnostics());
+              } catch {
+              }
+              lines2.push("");
+              lines2.push("DevTools URL: " + (settings.devtoolsUrl || "(none)"));
+              return { content: lines2.join("\n") };
+            }
             const lines = [
               "**Same More Boats**",
-              "Slash commands:",
-              "`/smb connect <ws://...>` - Connect React DevTools",
-              "`/smb url <ws://192.168.x.x:8097>` - Save DevTools URL",
               "",
-              "Status: " + (settings.devtoolsUrl ? "DevTools URL = " + settings.devtoolsUrl : "No DevTools URL set")
+              "Commands:",
+              "`/smb connect <ws://...>` \u2014 Connect React DevTools",
+              "`/smb url <ws://...>` \u2014 Save DevTools URL",
+              "`/smb status` \u2014 Show diagnostics",
+              "",
+              "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set")
             ];
             return { content: lines.join("\n") };
           } catch (e) {
@@ -1155,9 +1311,9 @@ var __vendettaPlugin = (() => {
           }
         }
       });
-      log7("slash command /smb registered");
+      log4("slash command /smb registered");
     } catch (e) {
-      log7("registerCommand fail", e);
+      log4("registerCommand fail", e);
     }
     return () => {
       if (unregCmd) {
@@ -1171,6 +1327,7 @@ var __vendettaPlugin = (() => {
   }
 
   // plugins/sameMoreBoats/src/index.ts
+  init_toast();
   var log8 = (...a) => {
     try {
       console.log("[SMB]", ...a);
@@ -1187,55 +1344,76 @@ var __vendettaPlugin = (() => {
         toast("Same More Boats already loaded");
         return;
       }
+      loaded = true;
+      log8("onLoad starting");
       initStorage().then(() => {
         log8("settings ready", JSON.stringify(settings));
-      }).catch((e) => {
-        log8("storage FAIL", e);
-      });
-      const cfg = settings;
-      let ok = 0;
-      let fail = 0;
-      const safe = (name, fn) => {
+        const cfg = settings;
+        const safe = (name, fn) => {
+          try {
+            const un = fn();
+            if (typeof un === "function")
+              patches.push(un);
+            log8("ok:", name);
+          } catch (e) {
+            log8("FAIL:", name, e);
+          }
+        };
+        safe("featureGates", () => {
+          const { patchFeatureGates: patchFeatureGates2 } = (init_featureGates(), __toCommonJS(featureGates_exports));
+          return patchFeatureGates2(cfg);
+        });
+        safe("components", () => {
+          const { patchComponents: patchComponents2 } = (init_components(), __toCommonJS(components_exports));
+          return patchComponents2();
+        });
+        if (cfg.tags)
+          safe("tags", () => {
+            const { enableTags: enableTags2 } = (init_tags(), __toCommonJS(tags_exports));
+            return enableTags2();
+          });
+        if (cfg.forums)
+          safe("forums", () => {
+            const { enableForums: enableForums2 } = (init_forums(), __toCommonJS(forums_exports));
+            return enableForums2();
+          });
+        if (cfg.serverSettings)
+          safe("serverSettings", () => {
+            const { enableServerSettings: enableServerSettings2 } = (init_serverSettings(), __toCommonJS(serverSettings_exports));
+            return enableServerSettings2();
+          });
+        if (cfg.groupedMembers)
+          safe("memberList", () => {
+            const { enableGroupedMemberList: enableGroupedMemberList2 } = (init_memberList(), __toCommonJS(memberList_exports));
+            return enableGroupedMemberList2();
+          });
+        if (cfg.contextMenu)
+          safe("contextMenu", () => {
+            const { expandContextMenu: expandContextMenu2 } = (init_contextMenu(), __toCommonJS(contextMenu_exports));
+            return expandContextMenu2();
+          });
+        if (cfg.devTools)
+          safe("devtools", () => {
+            const { enableDevTools: enableDevTools2 } = (init_devtools(), __toCommonJS(devtools_exports));
+            return enableDevTools2();
+          });
+        safe("styles", () => {
+          const { injectStyles: injectStyles2 } = (init_styles(), __toCommonJS(styles_exports));
+          styleEl = injectStyles2(cfg);
+        });
         try {
-          const un = fn();
-          if (typeof un === "function")
-            patches.push(un);
-          ok++;
-          log8("module ok:", name);
+          unregCmd2 = registerSmbCommand();
         } catch (e) {
-          fail++;
-          log8("module FAIL:", name, e);
+          log8("cmd reg fail", e);
         }
-      };
-      safe("featureGates", () => patchFeatureGates(cfg));
-      safe("styles", () => {
-        styleEl = injectStyles(cfg);
+        toast("Same More Boats loaded \u2713");
+      }).catch((e) => {
+        log8("initStorage chain FAIL", e);
+        toast("Same More Boats loaded (defaults)");
       });
-      safe("components", () => patchComponents());
-      if (cfg.tags)
-        safe("tags", () => enableTags());
-      if (cfg.forums)
-        safe("forums", () => enableForums());
-      if (cfg.serverSettings)
-        safe("serverSettings", () => enableServerSettings());
-      if (cfg.groupedMembers)
-        safe("memberList", () => enableGroupedMemberList());
-      if (cfg.contextMenu)
-        safe("contextMenu", () => expandContextMenu());
-      if (cfg.devTools)
-        safe("devtools", () => enableDevTools());
-      try {
-        unregCmd2 = registerSmbCommand();
-      } catch (e) {
-        log8("cmd reg fail", e);
-      }
-      loaded = true;
-      log8(`loaded: ${ok} ok, ${fail} failed`);
-      toast(
-        fail === 0 ? "Same More Boats loaded" : `Same More Boats: ${ok} on, ${fail} skipped`
-      );
     },
     onUnload() {
+      var _a;
       patches.forEach((unpatch) => {
         try {
           unpatch();
@@ -1252,7 +1430,7 @@ var __vendettaPlugin = (() => {
       }
       if (styleEl) {
         try {
-          styleEl.remove();
+          (_a = styleEl.remove) == null ? void 0 : _a.call(styleEl);
         } catch {
         }
         styleEl = null;
