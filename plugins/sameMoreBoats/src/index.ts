@@ -1,5 +1,5 @@
 import { initStorage, settings, registerSmbCommand } from "./modules/settings";
-import { toast } from "./modules/toast";
+import { toast, showAlert } from "./modules/toast";
 import { patchFeatureGates } from "./modules/featureGates";
 import { patchComponents } from "./modules/components";
 import { enableTags } from "./modules/tags";
@@ -53,7 +53,18 @@ export default {
 
         try { unregCmd = registerSmbCommand(); } catch (e) { log("cmd reg fail", e); }
 
-        toast("Same More Boats loaded ✓");
+        // Show a nice startup modal
+        const features: string[] = [];
+        if (cfg.tags) features.push("Tags");
+        if (cfg.forums) features.push("Forums");
+        if (cfg.serverSettings) features.push("Server Settings");
+        if (cfg.groupedMembers) features.push("Grouped Members");
+        if (cfg.contextMenu) features.push("Context Menu");
+        if (cfg.devTools) features.push("DevTools");
+        const featStr = features.length > 0
+          ? "Features: " + features.join(", ")
+          : "All features are disabled";
+        showAlert("Same More Boats", "Loaded successfully ✓\n" + featStr);
       })
       .catch((e: any) => {
         log("initStorage chain FAIL", e);
