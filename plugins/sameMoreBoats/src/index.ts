@@ -1,6 +1,14 @@
-
-import { initStorage, settings, DEFAULTS, registerSmbCommand } from "./modules/settings";
+import { initStorage, settings, registerSmbCommand } from "./modules/settings";
 import { toast } from "./modules/toast";
+import { patchFeatureGates } from "./modules/featureGates";
+import { patchComponents } from "./modules/components";
+import { enableTags } from "./modules/tags";
+import { enableForums } from "./modules/forums";
+import { enableServerSettings } from "./modules/serverSettings";
+import { enableGroupedMemberList } from "./modules/memberList";
+import { expandContextMenu } from "./modules/contextMenu";
+import { enableDevTools } from "./modules/devtools";
+import { injectStyles } from "./modules/styles";
 
 export type { SMBSettings } from "./modules/settings";
 
@@ -10,28 +18,6 @@ let patches: (() => void)[] = [];
 let styleEl: any = null;
 let loaded = false;
 let unregCmd: (() => void) | null = null;
-
-function loadModule(name: string, loader: () => Promise<any>) {
-  return loader()
-    .then((mod: any) => {
-      try {
-        const init = mod?.default ?? mod?.onLoad ?? mod?.init;
-        if (typeof init === "function") {
-          const un = init(settings);
-          if (typeof un === "function") patches.push(un);
-        } else if (typeof mod?.patchFeatureGates === "function") {
-          const un = mod.patchFeatureGates(settings);
-          if (typeof un === "function") patches.push(un);
-        }
-        log("module loaded:", name);
-      } catch (e) {
-        log("module init FAIL:", name, e);
-      }
-    })
-    .catch((e: any) => {
-      log("module import FAIL:", name, e);
-    });
-}
 
 export default {
   onLoad() {
@@ -55,42 +41,15 @@ export default {
           }
         };
 
-        safe("featureGates", () => {
-          const { patchFeatureGates } = require("./modules/featureGates");
-          return patchFeatureGates(cfg);
-        });
-        safe("components", () => {
-          const { patchComponents } = require("./modules/components");
-          return patchComponents();
-        });
-        if (cfg.tags) safe("tags", () => {
-          const { enableTags } = require("./modules/tags");
-          return enableTags();
-        });
-        if (cfg.forums) safe("forums", () => {
-          const { enableForums } = require("./modules/forums");
-          return enableForums();
-        });
-        if (cfg.serverSettings) safe("serverSettings", () => {
-          const { enableServerSettings } = require("./modules/serverSettings");
-          return enableServerSettings();
-        });
-        if (cfg.groupedMembers) safe("memberList", () => {
-          const { enableGroupedMemberList } = require("./modules/memberList");
-          return enableGroupedMemberList();
-        });
-        if (cfg.contextMenu) safe("contextMenu", () => {
-          const { expandContextMenu } = require("./modules/contextMenu");
-          return expandContextMenu();
-        });
-        if (cfg.devTools) safe("devtools", () => {
-          const { enableDevTools } = require("./modules/devtools");
-          return enableDevTools();
-        });
-        safe("styles", () => {
-          const { injectStyles } = require("./modules/styles");
-          styleEl = injectStyles(cfg);
-        });
+        safe("featureGates", () => patchFeatureGates(cfg));
+        safe("components", () => patchComponents());
+        if (cfg.tags) safe("tags", () => enableTags());
+        if (cfg.forums) safe("forums", () => enableForums());
+        if (cfg.serverSettings) safe("serverSettings", () => enableServerSettings());
+        if (cfg.groupedMembers) safe("memberList", () => enableGroupedMemberList());
+        if (cfg.contextMenu) safe("contextMenu", () => expandContextMenu());
+        if (cfg.devTools) safe("devtools", () => enableDevTools());
+        safe("styles", () => { styleEl = injectStyles(cfg); });
 
         try { unregCmd = registerSmbCommand(); } catch (e) { log("cmd reg fail", e); }
 

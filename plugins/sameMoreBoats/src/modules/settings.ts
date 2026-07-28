@@ -1,4 +1,9 @@
 import { React, ReactNative } from "@vendetta/metro/common";
+import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
+import { registerCommand } from "@vendetta/commands";
+import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
+import { connectToDebugger } from "@vendetta/debug";
+import { getDiagnostics } from "./components";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -34,10 +39,6 @@ export async function initStorage(): Promise<void> {
   if (storagePromise) return storagePromise;
   storagePromise = (async () => {
     try {
-      const storageMod: any = await import("@vendetta/storage");
-      const createMMKVBackend = storageMod.createMMKVBackend;
-      const createStorage = storageMod.createStorage;
-      const wrapSync = storageMod.wrapSync;
       if (!createMMKVBackend || !createStorage || !wrapSync) {
         log("storage: missing exports, using defaults");
         return;
@@ -62,21 +63,8 @@ export async function initStorage(): Promise<void> {
 let unregCmd: (() => void) | null = null;
 
 export function registerSmbCommand(): () => void {
-  if (unregCmd) return unregCmd;
+  if (unregCmd) return () => { if (unregCmd) { try { unregCmd(); } catch {} unregCmd = null; } };
   try {
-    let registerCommand: any;
-    let ApplicationCommandInputType: any;
-    let ApplicationCommandType: any;
-    try {
-      const cmdMod: any = require("@vendetta/commands");
-      registerCommand = cmdMod.registerCommand;
-      const constMod: any = require("@vendetta/constants");
-      ApplicationCommandInputType = constMod.ApplicationCommandInputType;
-      ApplicationCommandType = constMod.ApplicationCommandType;
-    } catch (e) {
-      log("commands module unavailable", e);
-      return () => {};
-    }
     if (!registerCommand) {
       log("registerCommand not found");
       return () => {};
@@ -116,8 +104,7 @@ export function registerSmbCommand(): () => void {
             if (!u) return { content: "No URL set. Use `/smb url <ws://...>`" };
             settings.devtoolsUrl = u;
             try {
-              const debugMod: any = await import("@vendetta/debug");
-              if (debugMod.connectToDebugger) debugMod.connectToDebugger(u);
+              if (connectToDebugger) connectToDebugger(u);
             } catch (e) { log("connect fail", e); }
             return { content: "Connecting to DevTools at " + u };
           }
@@ -129,8 +116,7 @@ export function registerSmbCommand(): () => void {
           if (action === "status") {
             const lines: string[] = [];
             try {
-              const compMod: any = await import("./components");
-              if (compMod.getDiagnostics) lines.push(...compMod.getDiagnostics());
+              if (getDiagnostics) lines.push(...getDiagnostics());
             } catch {}
             lines.push("");
             lines.push("DevTools URL: " + (settings.devtoolsUrl || "(none)"));
@@ -140,9 +126,9 @@ export function registerSmbCommand(): () => void {
             "**Same More Boats**",
             "",
             "Commands:",
-            "`/smb connect <ws://...>` — Connect React DevTools",
-            "`/smb url <ws://...>` — Save DevTools URL",
-            "`/smb status` — Show diagnostics",
+            "`/smb connect <ws://...>` \u2014 Connect React DevTools",
+            "`/smb url <ws://...>` \u2014 Save DevTools URL",
+            "`/smb status` \u2014 Show diagnostics",
             "",
             "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];

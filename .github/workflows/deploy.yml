@@ -22,8 +22,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install esbuild@0.24.0
+      - run: npm install --global pnpm
+      - run: pnpm install
       - run: node build.mjs
+      - name: Copy README
+        run: cp README.md dist/README.md
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
