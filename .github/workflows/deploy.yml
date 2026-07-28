@@ -25,8 +25,10 @@ jobs:
       - run: npm install --global pnpm
       - run: pnpm install
       - run: node build.mjs
-      - name: Copy README
-        run: cp README.md dist/README.md
+      - name: Copy static files
+        run: |
+          cp README.md dist/README.md
+          cp index.html dist/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
