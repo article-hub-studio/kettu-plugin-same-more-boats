@@ -1,12 +1,22 @@
 import { React, ReactNative } from "@vendetta/metro/common";
-import { find, findByName, findByNameAll, findByProps, findByDisplayName, findByDisplayNameAll, findByStoreName } from "@vendetta/metro";
-import { before, after, instead } from "@vendetta/patcher";
+import {
+  find,
+  findByName,
+  findByNameAll,
+  findByProps,
+  findByDisplayName,
+  findByDisplayNameAll,
+  findByStoreName,
+} from "@vendetta/metro";
+import { before, after } from "@vendetta/patcher";
+import { copyText } from "./clipboard";
+import { toast } from "./toast";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
 type Unpatch = () => void;
 
-const { View, Text, TouchableOpacity, Platform } = ReactNative as any;
+const { View, Text, TouchableOpacity } = ReactNative as any;
 
 const roleCache = new Map<string, Map<string, any>>();
 function refreshRoles(guildId: string, roles: any[]) {
@@ -15,12 +25,11 @@ function refreshRoles(guildId: string, roles: any[]) {
   if (!map) { map = new Map(); roleCache.set(guildId, map); }
   for (const r of roles) if (r?.id) map.set(r.id, r);
 }
-function findRole(guildId: string, roleId: string) {
-  return roleCache.get(guildId)?.get(roleId) ?? null;
-}
-
 export function refreshRoleCache(guildId: string, roles: any[]) {
   refreshRoles(guildId, roles);
+}
+function findRole(guildId: string, roleId: string) {
+  return roleCache.get(guildId)?.get(roleId) ?? null;
 }
 
 function BotTagPill({ text, color }: { text: string; color?: string }) {
@@ -49,6 +58,18 @@ function computeTagsFor(author: any, member: any, guildId?: string): { text: str
   try {
     if (author?.bot) tags.push({ text: "BOT", color: "#5865F2" });
     if (author?.system) tags.push({ text: "SYSTEM", color: "#4E5058" });
+    if (author?.flags != null) {
+      const flags = author.flags;
+      if (flags & 1 << 16) tags.push({ text: "BOT", color: "#5865F2" });
+      if (flags & 1) tags.push({ text: "STAFF", color: "#5865F2" });
+      if (flags & (1 << 2)) tags.push({ text: "HYPESQUAD", color: "#f47b67" });
+      if (flags & (1 << 3)) tags.push({ text: "BUG HUNTER", color: "#3ba55d" });
+      if (flags & (1 << 9)) tags.push({ text: "EARLY", color: "#7289da" });
+      if (flags & (1 << 14)) tags.push({ text: "BUG HUNTER GOLD", color: "#faa61a" });
+      if (flags & (1 << 6)) tags.push({ text: "HYPESQUAD BRILLIANCE", color: "#f47b67" });
+      if (flags & (1 << 7)) tags.push({ text: "HYPESQUAD BRAVERY", color: "#9c84ef" });
+      if (flags & (1 << 8)) tags.push({ text: "HYPESQUAD BALANCE", color: "#45ddc0" });
+    }
     if (member?.roles && guildId) {
       for (const roleId of member.roles) {
         const role = findRole(guildId, roleId);
@@ -73,7 +94,6 @@ function tagsRow(tags: { text: string; color?: string }[]) {
 function safeFind(label: string, fn: () => any): any {
   try {
     const r = fn();
-    log("find", label, r ? "OK" : "miss");
     return r;
   } catch (e) {
     log("find", label, "ERR", e);
@@ -81,29 +101,24 @@ function safeFind(label: string, fn: () => any): any {
   }
 }
 
-// Attempt to find the Nameplate / Username component via many strategies.
 function findNameplate(): any[] {
   const results: any[] = [];
-  const names = ["Nameplate", "NameplateInner", "Username", "MessageAuthor", "BotTag", "BotTagRegular"];
+  const seen = new Set<any>();
+  const add = (x: any) => { if (x && !seen.has(x)) { seen.add(x); results.push(x); } };
+  const names = ["Nameplate", "NameplateInner", "Username", "MessageAuthor", "BotTag", "BotTagRegular", "AuthorTag"];
   for (const n of names) {
-    const a = safeFind("name:" + n, () => findByName(n, false));
-    if (a) results.push(a);
+    add(safeFind("name:" + n, () => findByName(n, false)));
     const all = safeFind("nameAll:" + n, () => findByNameAll(n, false));
-    if (Array.isArray(all)) for (const x of all) if (x && !results.includes(x)) results.push(x);
-    const d = safeFind("dn:" + n, () => findByDisplayName(n, false));
-    if (d) results.push(d);
+    if (Array.isArray(all)) for (const x of all) add(x);
+    add(safeFind("dn:" + n, () => findByDisplayName(n, false)));
     const dall = safeFind("dnAll:" + n, () => findByDisplayNameAll(n, false));
-    if (Array.isArray(dall)) for (const x of dall) if (x && !results.includes(x)) results.push(x);
-    const p = safeFind("props:" + n, () => {
-      const m = findByProps(n);
-      return m ? m[n] : null;
-    });
-    if (p) results.push(p);
+    if (Array.isArray(dall)) for (const x of dall) add(x);
+    const p = safeFind("props:" + n, () => { const m = findByProps(n); return m ? m[n] : null; });
+    add(p);
   }
   return results;
 }
 
-// Inject tags into a rendered element by cloning with extra children.
 function injectTagsIntoElement(ret: any, tags: any[]): any {
   if (!tags.length || !ret) return ret;
   try {
@@ -125,7 +140,6 @@ function injectTagsIntoElement(ret: any, tags: any[]): any {
   }
 }
 
-// Patch a component function: try 'default', 'type', then the fn itself.
 function patchComponentRender(comp: any, label: string, handleRet: (args: any[], ret: any) => any): Unpatch | void {
   if (!comp) return;
   const unpatches: Unpatch[] = [];
@@ -150,14 +164,14 @@ function patchComponentRender(comp: any, label: string, handleRet: (args: any[],
       if (typeof un === "function") { unpatches.push(un); log(label, "patched self"); ok = true; }
     } catch (e) { log(label, "self patch FAIL", e); }
   }
-  if (!ok) { log(label, "no patchable key found"); return; }
+  if (!ok) { log(label, "no patchable key"); return; }
   return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
 
 function patchMessageAuthor(): Unpatch | void {
   const comps = findNameplate();
   if (!comps.length) {
-    log("MessageAuthor: no components found at all");
+    log("MessageAuthor: no components found");
     return;
   }
   log("MessageAuthor: found", comps.length, "candidates");
@@ -179,15 +193,12 @@ function patchMessageAuthor(): Unpatch | void {
   return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
 
-// ---- Context menu patch ----
-// Mobile Discord context menus: items are built by a function returning an array
-// of {label, action, ...} or React elements. We search broadly.
 function patchContextMenuItems(): Unpatch | void {
   const finderKeys = [
     "buildMessageContextMenuItems", "buildContextMenuItems", "menuItems",
     "getMessageContextMenus", "openContextMenu", "buildMenu", "getMenuItems",
     "ContextMenuContainer", "MenuContainer", "ActionSheetPresenter",
-    "MessageContextMenu", "ContextMenu",
+    "MessageContextMenu", "ContextMenu", "openMenu",
   ];
   let targetMod: any = null;
   let targetFnName = "";
@@ -207,13 +218,13 @@ function patchContextMenuItems(): Unpatch | void {
         if (!mod || typeof mod !== "object") return false;
         for (const k of Object.keys(mod)) {
           const v = mod[k];
-          if (typeof v === "function" && /context.?menu|menuItems|buildMenu|getMenuItems/i.test(k)) return true;
+          if (typeof v === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) return true;
         }
         return false;
       });
       if (m) {
         for (const k of Object.keys(m)) {
-          if (typeof m[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems/i.test(k)) {
+          if (typeof m[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
             targetMod = m;
             targetFnName = k;
             break;
@@ -224,7 +235,7 @@ function patchContextMenuItems(): Unpatch | void {
   }
 
   if (!targetMod || !targetFnName) {
-    log("ContextMenu: no builder found anywhere");
+    log("ContextMenu: no builder found");
     return;
   }
 
@@ -242,11 +253,7 @@ function patchContextMenuItems(): Unpatch | void {
           label: "Copy ID",
           id: "smb-copy-id",
           action: () => {
-            try {
-              const clip = (ReactNative as any).Clipboard;
-              if (clip?.setString) clip.setString(String(target.id));
-            } catch {}
-            log("Copy ID:", target.id);
+            if (copyText(String(target.id))) toast("Copied ID: " + target.id);
           },
         });
       }
@@ -255,11 +262,18 @@ function patchContextMenuItems(): Unpatch | void {
           label: "Copy Message Link",
           id: "smb-copy-link",
           action: () => {
-            try {
-              const guild = ctx.guildId ? `${ctx.guildId}/` : "@me/";
-              const clip = (ReactNative as any).Clipboard;
-              if (clip?.setString) clip.setString(`https://discord.com/channels/${guild}${ctx.channelId}/${ctx.message.id}`);
-            } catch {}
+            const guild = ctx.guildId ? `${ctx.guildId}/` : "@me/";
+            if (copyText(`https://discord.com/channels/${guild}${ctx.channelId}/${ctx.message.id}`))
+              toast("Message link copied");
+          },
+        });
+      }
+      if (ctx.message?.content) {
+        additions.push({
+          label: "Copy Raw Message",
+          id: "smb-copy-raw",
+          action: () => {
+            if (copyText(ctx.message.content)) toast("Raw message copied");
           },
         });
       }
@@ -268,10 +282,24 @@ function patchContextMenuItems(): Unpatch | void {
           label: "Copy User ID",
           id: "smb-copy-user-id",
           action: () => {
-            try {
-              const clip = (ReactNative as any).Clipboard;
-              if (clip?.setString) clip.setString(String(ctx.user.id));
-            } catch {}
+            if (copyText(String(ctx.user.id))) toast("User ID copied");
+          },
+        });
+        additions.push({
+          label: "Copy Username",
+          id: "smb-copy-username",
+          action: () => {
+            const uname = ctx.user.username + (ctx.user.discriminator ? "#" + ctx.user.discriminator : "");
+            if (copyText(uname)) toast("Username copied");
+          },
+        });
+      }
+      if (ctx.channel?.id) {
+        additions.push({
+          label: "Copy Channel ID",
+          id: "smb-copy-channel-id",
+          action: () => {
+            if (copyText(String(ctx.channel.id))) toast("Channel ID copied");
           },
         });
       }
@@ -288,6 +316,18 @@ function patchContextMenuItems(): Unpatch | void {
   });
 }
 
+function patchDeveloperMode(): Unpatch | void {
+  try {
+    const store = safeFind("DeveloperModeStore", () => findByStoreName("DeveloperModeStore"));
+    if (!store) { log("DeveloperModeStore not found"); return; }
+    const orig = store.getDeveloperMode?.bind(store);
+    if (typeof orig !== "function") { log("getDeveloperMode not a function"); return; }
+    store.getDeveloperMode = () => true;
+    log("DeveloperMode forced ON");
+    return () => { try { store.getDeveloperMode = orig; } catch {} };
+  } catch (e) { log("patchDeveloperMode FAIL", e); }
+}
+
 function diagnostics(): string[] {
   const out: string[] = [];
   const checks: [string, () => any][] = [
@@ -299,9 +339,12 @@ function diagnostics(): string[] {
     ["nameplate", () => findByName("Nameplate", false)],
     ["nameplateInner", () => findByName("NameplateInner", false)],
     ["username", () => findByName("Username", false)],
+    ["botTag", () => findByName("BotTag", false)],
     ["GuildStore", () => findByStoreName("GuildStore")],
     ["GuildMemberStore", () => findByStoreName("GuildMemberStore")],
     ["RoleStore", () => findByStoreName("RoleStore")],
+    ["DeveloperModeStore", () => findByStoreName("DeveloperModeStore")],
+    ["clipboard", () => findByProps("setString")],
   ];
   for (const [label, fn] of checks) {
     try {
@@ -331,6 +374,7 @@ export function patchComponents(): Unpatch {
 
   safe("messageAuthor", patchMessageAuthor);
   safe("contextMenu", patchContextMenuItems);
+  safe("developerMode", patchDeveloperMode);
 
   log("component patches:", un.length);
   return () => un.forEach((u) => { try { u(); } catch {} });

@@ -8,6 +8,7 @@ import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
 import { registerCommand } from "@vendetta/commands";
 import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
 import { toast } from "./toast";
+import { runRecon } from "./recon";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -31,7 +32,7 @@ export const DEFAULTS: SMBSettings = {
   contextMenu: true,
   devTools: false,
   forceDesktopLayout: false,
-  recon: true,
+  recon: false,
   devtoolsUrl: "",
 };
 
@@ -209,6 +210,9 @@ function SettingsPanel({ close }: any) {
     React.createElement(View, { style: { padding: 16 } },
       React.createElement(TouchableOpacity, { onPress: showStatus, style: { backgroundColor: "#2b2d31", borderRadius: 8, padding: 14, marginBottom: 10, alignItems: "center" } },
         React.createElement(Text, { style: { color: "#dcddde", fontSize: 15, fontWeight: "600" } }, "Status / Diagnostics"),
+      ),
+      React.createElement(TouchableOpacity, { onPress: () => { try { runRecon(); } catch (e) { toast("recon err"); } }, style: { backgroundColor: "#2b2d31", borderRadius: 8, padding: 14, marginBottom: 10, alignItems: "center" } },
+        React.createElement(Text, { style: { color: "#dcddde", fontSize: 15, fontWeight: "600" } }, "Run Recon (Component Discovery)"),
       ),
       React.createElement(TouchableOpacity, { onPress: close, style: { backgroundColor: "#4f545c", borderRadius: 8, padding: 14, alignItems: "center" } },
         React.createElement(Text, { style: { color: "#fff", fontSize: 15, fontWeight: "600" } }, "Close"),

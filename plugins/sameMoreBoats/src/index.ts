@@ -1,8 +1,4 @@
-// Same More Boats — PC feature parity for Discord mobile (Kettu/Vendetta/Revenge)
-// Fail-soft loader. Settings persisted via MMKV storage, slash command /smb.
-
 import { FluxDispatcher } from "@vendetta/metro/common";
-import { before } from "@vendetta/patcher";
 
 import { enableTags } from "./modules/tags";
 import { enableForums } from "./modules/forums";
@@ -12,8 +8,7 @@ import { expandContextMenu } from "./modules/contextMenu";
 import { enableDevTools } from "./modules/devtools";
 import { patchFeatureGates } from "./modules/featureGates";
 import { injectStyles } from "./modules/styles";
-import { notify, toast } from "./modules/toast";
-import { runRecon } from "./modules/recon";
+import { toast } from "./modules/toast";
 import { patchComponents } from "./modules/components";
 import { initStorage, settings, DEFAULTS, openSettings, registerSmbCommand } from "./modules/settings";
 
@@ -54,28 +49,23 @@ export default {
 
     safe("featureGates", () => patchFeatureGates(cfg));
     safe("styles", () => { styleEl = injectStyles(cfg); });
+    safe("components", () => patchComponents());
     if (cfg.tags) safe("tags", () => enableTags());
     if (cfg.forums) safe("forums", () => enableForums());
     if (cfg.serverSettings) safe("serverSettings", () => enableServerSettings());
     if (cfg.groupedMembers) safe("memberList", () => enableGroupedMemberList());
     if (cfg.contextMenu) safe("contextMenu", () => expandContextMenu());
     if (cfg.devTools) safe("devtools", () => enableDevTools());
-    safe("components", () => patchComponents());
 
     try { unregCmd = registerSmbCommand(); } catch (e) { log("cmd reg fail", e); }
 
     loaded = true;
     log(`loaded: ${ok} ok, ${fail} failed`);
-    notify(
+    toast(
       fail === 0
-        ? "Same More Boats loaded — PC features on mobile"
-        : `Same More Boats: ${ok} on, ${fail} skipped`,
-      fail === 0 ? "ok" : "fail"
+        ? "Same More Boats loaded"
+        : `Same More Boats: ${ok} on, ${fail} skipped`
     );
-
-    if (cfg.recon) {
-      try { runRecon(); } catch (e) { log("recon FAIL", e); }
-    }
   },
 
   onUnload() {

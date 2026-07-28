@@ -1,17 +1,33 @@
-// Native RN clipboard helper — no DOM needed.
 import { clipboard } from "@vendetta/metro/common";
+import { ReactNative } from "@vendetta/metro/common";
+import { findByProps } from "@vendetta/metro";
+
+const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
 export function copyText(text: string): boolean {
   try {
-    (clipboard as any).setString?.(text);
-    return true;
-  } catch {}
+    const c = clipboard as any;
+    if (c && typeof c.setString === "function") { c.setString(text); return true; }
+    if (c && typeof c.copy === "function") { c.copy(text); return true; }
+    if (c?.default?.setString) { c.default.setString(text); return true; }
+  } catch (e) { log("clipboard v1 FAIL", e); }
+
   try {
-    // some builds expose default
-    (clipboard as any)?.default?.setString?.(text);
-    return true;
+    const rnClip = (ReactNative as any).Clipboard;
+    if (rnClip?.setString) { rnClip.setString(text); return true; }
+    if (rnClip?.setStringAsync) { rnClip.setStringAsync(text); return true; }
+  } catch (e) { log("clipboard RN FAIL", e); }
+
+  try {
+    const mod = findByProps("setString", "getString");
+    if (mod?.setString) { mod.setString(text); return true; }
+  } catch (e) { log("clipboard metro FAIL", e); }
+
+  try {
+    const mod = findByProps("Clipboard");
+    if (mod?.Clipboard?.setString) { mod.Clipboard.setString(text); return true; }
   } catch {}
-  // last resort: DOM (works only on web/webview)
+
   try {
     const el = document.createElement("textarea");
     el.value = text;

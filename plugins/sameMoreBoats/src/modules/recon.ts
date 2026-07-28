@@ -1,13 +1,8 @@
-// Recon v2: stronger component discovery.
-// findByDisplayName failed for all confirmed components (inline/Memo'd).
-// Try findByProps, findByName, findByDisplayNameAll, and metro.find(filter).
-
 import {
   find,
   findByDisplayName,
   findByDisplayNameAll,
   findByProps,
-  findByPropsAll,
   findByName,
   findByNameAll,
   findByStoreName,
@@ -29,15 +24,14 @@ export function runRecon(): void {
     "BotTag", "BotTagRegular", "RoleTag", "AuthorTag",
     "MemberListGroup", "MemberListItem", "MembersList",
     "ContextMenu", "MessageContextMenu",
+    "Nameplate", "NameplateInner", "Username", "MessageAuthor",
   ];
 
-  // findByDisplayNameAll — catches Memo-wrapped too?
   for (const t of targets) {
     const all = safe(() => (findByDisplayNameAll as any)(t));
     lines.push(`dnAll:${t} ${all && all.length ? "OK " + all.length : "miss"}`);
   }
 
-  // findByProps — module exporting component as a property
   for (const t of targets) {
     const m = safe(() => (findByProps as any)(t));
     if (m) {
@@ -49,15 +43,12 @@ export function runRecon(): void {
     }
   }
 
-  // findByName
   for (const t of targets) {
     const m = safe(() => (findByName as any)(t, false));
     lines.push(`name:${t} ${m ? "OK" : "miss"}`);
   }
 
-  // metro.find with custom filter: look for any module whose any property has
-  // a displayName containing a target keyword.
-  const kw = ["Role", "Tag", "Forum", "Profile", "Member", "Channel", "Bot", "Badge", "Context", "Menu", "Guild", "Setting", "MessageAuthor"];
+  const kw = ["Role", "Tag", "Forum", "Profile", "Member", "Channel", "Bot", "Badge", "Context", "Menu", "Guild", "Setting", "MessageAuthor", "Nameplate"];
   try {
     const matched = (find as any)((m: any) => {
       if (!m || typeof m !== "object") return false;
@@ -76,7 +67,6 @@ export function runRecon(): void {
       return false;
     });
     if (matched) {
-      // collect displayNames from matched module
       const dns: string[] = [];
       const collect = (o: any) => {
         if (o && typeof o === "object" && typeof o.displayName === "string") dns.push(o.displayName);
@@ -95,7 +85,7 @@ export function runRecon(): void {
   const body = lines.join("\n");
   try {
     (showConfirmationAlert as any)({
-      title: `SMB recon v2`,
+      title: `SMB recon`,
       content: body,
       confirmText: "OK",
       isDismissable: true,
