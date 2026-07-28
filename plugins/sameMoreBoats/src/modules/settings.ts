@@ -21,9 +21,9 @@ export type SMBSettings = {
 
 export const DEFAULTS: SMBSettings = {
   tags: true,
-  forums: true,
-  serverSettings: true,
-  groupedMembers: true,
+  forums: false,
+  serverSettings: false,
+  groupedMembers: false,
   contextMenu: true,
   devTools: false,
   forceDesktopLayout: false,
