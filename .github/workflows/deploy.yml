@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install esbuild
+      - run: npm install esbuild@0.24.0
       - run: node build.mjs
       - uses: actions/upload-pages-artifact@v3
         with:

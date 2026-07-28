@@ -1,4 +1,3 @@
-import { FluxDispatcher } from "@vendetta/metro/common";
 
 import { initStorage, settings, DEFAULTS, registerSmbCommand } from "./modules/settings";
 import { toast } from "./modules/toast";
