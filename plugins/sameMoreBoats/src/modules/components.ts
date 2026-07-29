@@ -394,112 +394,158 @@ function buildContextMenuAdditions(ctx: any): any[] {
   return additions;
 }
 
+
 function hasDupeItem(items: any[], addition: any): boolean {
   if (!addition?.id) return false;
   return items.some((i: any) => i?.id === addition.id);
 }
 
-function injectAdditions(items: any[], ctx: any): boolean {
-  if (!Array.isArray(items)) return false;
-  const additions = buildContextMenuAdditions(ctx);
-  if (!additions.length) return false;
-  // Check we haven't already added our items
-  if (additions.some((a) => hasDupeItem(items, a))) return false;
-  additions.unshift({ type: "divider", id: "smb-divider" });
-  items.push(...additions);
-  return true;
+function hasDupeLabel(items: any[], label: string): boolean {
+  return items.some((i: any) => typeof i === "string" && i === label);
+}
+
+function ctxDebugDump(ctx: any, label: string) {
+  try {
+    const dump: any = {};
+    if (ctx) {
+      for (const k of Object.keys(ctx)) {
+        try {
+          const v = ctx[k];
+          if (typeof v === "string") dump[k] = v;
+          else if (typeof v === "number") dump[k] = v;
+          else if (typeof v === "boolean") dump[k] = v;
+          else if (Array.isArray(v)) dump[k] = `Array(${v.length})`;
+          else if (v === null) dump[k] = null;
+          else if (typeof v === "function") dump[k] = "fn";
+          else dump[k] = typeof v;
+        } catch {}
+      }
+    }
+    log("ctxDump", label, JSON.stringify(dump).slice(0, 500));
+    // Also dump items arrays
+    for (const key of ["items", "menuItems", "rows", "options", "actions", "children", "sections"]) {
+      if (Array.isArray(ctx?.[key]) && ctx[key].length > 0) {
+        const sample = ctx[key].slice(0, 3).map((x: any) => {
+          if (typeof x === "string") return x;
+          if (typeof x === "object" && x) return JSON.stringify(x).slice(0, 120);
+          return typeof x;
+        });
+        log("ctxDump items in", key, ":", JSON.stringify(sample));
+      }
+    }
+  } catch (e) { log("ctxDebugDump FAIL", e); }
+}
+
+// Try to inject additions into an items array. Handles both object items and string items.
+function tryInject(items: any[], ctx: any): boolean {
+  if (!Array.isArray(items) || !items.length) return false;
+  try {
+    const additions = buildContextMenuAdditions(ctx);
+    if (!additions.length) return false;
+
+    // Check if items are strings (ActionSheet style) or objects
+    const isStringItems = typeof items[0] === "string";
+    
+    if (isStringItems) {
+      // ActionSheet style - items are strings like ["Cancel", "Option 1"]
+      // We need to add our items as strings too
+      let changed = false;
+      for (const add of additions) {
+        const label = add.label;
+        if (!label || hasDupeLabel(items, label)) continue;
+        // Insert before the last item (usually Cancel)
+        if (items.length > 0) {
+          items.splice(items.length - 1, 0, label);
+        } else {
+          items.push(label);
+        }
+        changed = true;
+      }
+      return changed;
+    }
+
+    // Object items - standard format
+    if (additions.some((a: any) => hasDupeItem(items, a))) return false;
+    // Insert divider then additions
+    items.push({ type: "divider", id: "smb-divider" });
+    items.push(...additions);
+    return true;
+  } catch (e) { log("tryInject FAIL", e); return false; }
 }
 
 function patchContextMenuItems(): Unpatch | void {
   const unpatches: (() => void)[] = [];
 
-  // Helper: always returns at least one item
-  function makeAdditions(ctx: any): any[] {
-    const additions = buildContextMenuAdditions(ctx);
-    if (!additions.length) {
-      additions.push({
-        label: "Same More Boats \u2713",
-        id: "smb-header",
-        action: () => { toast("SMB active"); },
-      });
-    }
-    return additions;
-  }
-
-  // Helper: inject additions into an items array
-  function tryInject(items: any[], ctx: any): boolean {
-    if (!Array.isArray(items)) return false;
-    try {
-      const add = makeAdditions(ctx);
-      if (!add.length) return false;
-      if (add.some((a) => items.some((i: any) => i?.id === a.id))) return false;
-      // Try concat first (immutable), fallback to push
-      add.unshift({ type: "divider", id: "smb-divider" });
-      if (typeof items.concat === "function") {
-        const updated = items.concat(add);
-        // If concat returns a different array, try to assign back
-        if (updated !== items && items.length < updated.length) {
-          items.length = 0;
-          items.push(...updated);
-          return true;
+  // --- Strategy 1: ContextMenuContainer component render ---  
+  const ctxContainerMod = safeFind("ContextMenuContainer", () => findByProps("ContextMenuContainer"));
+  if (ctxContainerMod?.ContextMenuContainer) {
+    log("ContextMenu: ContextMenuContainer");
+    const un = patchComponentRender(ctxContainerMod.ContextMenuContainer, "ctxContainer", (_args: any[], ret: any) => {
+      try {
+        const props = _args?.[0] ?? {};
+        // Items might be in props directly or in the data prop
+        for (const key of ["items", "menuItems", "children", "data"]) {
+          if (Array.isArray(props[key])) {
+            tryInject(props[key], props); break;
+          }
         }
-      }
-      items.push(...add);
-      return true;
-    } catch (e) { log("tryInject FAIL", e); return false; }
+      } catch {}
+      return ret;
+    });
+    if (typeof un === "function") unpatches.push(un);
   }
 
-  // --- Strategy 1: Patch showContextMenu with instead ---
+  // --- Strategy 2: Patch showContextMenu ---
   const showCtxMod = safeFind("showContextMenu", () => findByProps("showContextMenu"));
   if (showCtxMod && typeof showCtxMod.showContextMenu === "function") {
-    log("ContextMenu: showContextMenu");
+    log("ContextMenu: showContextMenu (after)");
     unpatches.push(
-      (instead as any)("showContextMenu", showCtxMod, (args: any[], orig: Function) => {
+      (after as any)("showContextMenu", showCtxMod, (args: any[], ret: any) => {
         try {
-          // showContextMenu signature unknown - try all args that look like config
-          for (let i = 0; i < args.length; i++) {
-            const arg = args[i];
+          // Try all args that look like config
+          for (const arg of args) {
             if (arg && typeof arg === "object") {
-              // Try to find and inject into items arrays at any nesting level
-              const searchAndInject = (obj: any, depth = 0): boolean => {
+              ctxDebugDump(arg, "showContextMenu");
+              // Deep scan for items arrays
+              const scan = (obj: any, depth = 0): boolean => {
                 if (!obj || depth > 3) return false;
-                for (const key of ["items", "menuItems", "rows", "options", "actions", "children"]) {
+                for (const key of ["items", "menuItems", "rows", "options", "actions", "children", "sections"]) {
                   if (Array.isArray(obj[key])) {
                     if (tryInject(obj[key], obj)) return true;
                   }
                 }
                 if (obj.data) {
-                  for (const key of ["items", "menuItems"]) {
+                  for (const key of ["items", "menuItems", "children"]) {
                     if (Array.isArray(obj.data[key])) {
                       if (tryInject(obj.data[key], obj.data)) return true;
                     }
                   }
                 }
-                // Recurse into nested objects
                 for (const k of Object.keys(obj)) {
                   if (typeof obj[k] === "object" && obj[k] !== null && !Array.isArray(obj[k])) {
-                    if (searchAndInject(obj[k], depth + 1)) return true;
+                    if (scan(obj[k], depth + 1)) return true;
                   }
                 }
                 return false;
               };
-              searchAndInject(arg);
+              scan(arg);
             }
           }
         } catch (e) { log("ctx showContextMenu FAIL", e); }
-        return orig(...args);
+        return ret;
       })
     );
   }
 
-  // --- Strategy 2: Patch updateContextMenuState ---
-  const updMod = showCtxMod || safeFind("showContextMenu", () => findByProps("updateContextMenuState"));
+  // --- Strategy 3: Patch updateContextMenuState (context/reducer pattern) ---
+  const updMod = showCtxMod || safeFind("updateContextMenuState", () => findByProps("updateContextMenuState"));
   if (updMod && typeof updMod.updateContextMenuState === "function") {
     log("ContextMenu: updateContextMenuState");
     unpatches.push(
       (before as any)("updateContextMenuState", updMod, (args: any[]) => {
         try {
           const stateUpdate = args[0] ?? {};
+          ctxDebugDump(stateUpdate, "updateContextMenuState");
           const searchAndInject = (obj: any, depth = 0): boolean => {
             if (!obj || depth > 3) return false;
             for (const key of ["items", "menuItems", "rows"]) {
@@ -520,7 +566,7 @@ function patchContextMenuItems(): Unpatch | void {
     );
   }
 
-  // --- Strategy 3: Patch openContextMenu ---
+  // --- Strategy 4: Patch openContextMenu ---
   const openCtx = safeFind("openContextMenu", () => findByProps("openContextMenu"));
   if (openCtx && typeof openCtx.openContextMenu === "function") {
     log("ContextMenu: openContextMenu");
@@ -529,6 +575,7 @@ function patchContextMenuItems(): Unpatch | void {
         try {
           for (const arg of args) {
             if (arg && typeof arg === "object") {
+              ctxDebugDump(arg, "openContextMenu");
               for (const key of ["items", "menuItems", "rows", "options", "actions"]) {
                 if (Array.isArray(arg[key])) {
                   tryInject(arg[key], arg);
@@ -549,7 +596,23 @@ function patchContextMenuItems(): Unpatch | void {
     );
   }
 
-  // --- Strategy 4: showActionSheet ---
+  // --- Strategy 5: BottomSheet component ---
+  const bsMod = safeFind("BottomSheet", () => findByProps("BottomSheet"));
+  if (bsMod?.BottomSheet) {
+    log("ContextMenu: BottomSheet");
+    const un = patchComponentRender(bsMod.BottomSheet, "bottomSheet", (a: any[], r: any) => {
+      try {
+        const p = a?.[0] ?? {};
+        for (const k of ["items", "children", "rows"]) {
+          if (Array.isArray(p[k])) { tryInject(p[k], p); break; }
+        }
+      } catch {}
+      return r;
+    });
+    if (typeof un === "function") unpatches.push(un);
+  }
+
+  // --- Strategy 6: showActionSheet ---
   const actionMod = safeFind("showActionSheet", () => findByProps("showActionSheet"));
   if (actionMod) {
     if (typeof actionMod.showActionSheet === "function") {
@@ -558,6 +621,7 @@ function patchContextMenuItems(): Unpatch | void {
         (before as any)("showActionSheet", actionMod, (args: any[]) => {
           try {
             const config = args[0] ?? {};
+            ctxDebugDump(config, "showActionSheet");
             for (const key of ["items", "options", "menuItems"]) {
               if (Array.isArray(config[key])) {
                 tryInject(config[key], config); break;
@@ -567,6 +631,7 @@ function patchContextMenuItems(): Unpatch | void {
         })
       );
     }
+    // Also try patching the default export
     if (typeof actionMod.default === "function") {
       log("ContextMenu: ActionSheet(default)");
       const orig = actionMod.default;
@@ -585,7 +650,7 @@ function patchContextMenuItems(): Unpatch | void {
     }
   }
 
-  // --- Strategy 5: Flux dispatch ---
+  // --- Strategy 7: Flux dispatch intercept ---
   try {
     if (FluxDispatcher && typeof FluxDispatcher.dispatch === "function") {
       unpatches.push(
@@ -603,6 +668,31 @@ function patchContextMenuItems(): Unpatch | void {
           } catch {}
         })
       );
+    }
+  } catch {}
+
+  // --- Strategy 8: Direct ContextMenuStore patch ---
+  try {
+    // The module with showContextMenu also has ContextMenuStore
+    if (showCtxMod && showCtxMod.ContextMenuStore) {
+      log("ContextMenu: ContextMenuStore");
+      // Try to find a method that stores items
+      const store = showCtxMod.ContextMenuStore;
+      if (typeof store.getState === "function") {
+        const un = (before as any)("getState", store, () => {
+          try {
+            const state = store.getState();
+            if (state) {
+              for (const key of ["items", "menuItems", "rows"]) {
+                if (Array.isArray(state[key])) {
+                  tryInject(state[key], state);
+                }
+              }
+            }
+          } catch {}
+        });
+        if (typeof un === "function") unpatches.push(un);
+      }
     }
   } catch {}
 
