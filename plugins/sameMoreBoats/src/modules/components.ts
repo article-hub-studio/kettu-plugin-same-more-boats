@@ -163,90 +163,28 @@ function safeFind(label: string, fn: () => any): any {
 }
 
 
-// Cached Discord context menu components (initialized lazily)
-let _ctxButtonComp: any = null;
-let _ctxIconComp: any = null;
-
-function initCtxComponents() {
-  try {
-    const ctxMod = findByProps("ContextMenuContainer");
-    _ctxButtonComp = ctxMod?.Button || null;
-    // Try finding by name as fallback
-    if (!_ctxButtonComp) {
-      try { _ctxButtonComp = findByName("Button", false); } catch {}
-      if (!_ctxButtonComp) {
-        try { _ctxButtonComp = findByName("Row", false); } catch {}
-      }
+// Find the component type from existing React element items
+function getItemComponentType(items: any[]): any {
+  for (const item of items) {
+    if (React.isValidElement(item)) {
+      return item.type;
     }
-    // Try to find icon component
-    try {
-      const imgMod = findByProps("Image");
-      if (imgMod?.Image) _ctxIconComp = imgMod.Image;
-    } catch {}
-    try {
-      const iconByName = findByName("Icon", false);
-      if (iconByName) _ctxIconComp = iconByName;
-    } catch {}
-    try {
-      const svgMod = findByName("SvgIcon", false);
-      if (svgMod) _ctxIconComp = svgMod;
-    } catch {}
-  } catch {}
+  }
+  return null;
 }
 
-const SMBMenuColors = {
-  text: "#dcddde",
-  bgActive: "#040405", 
-  separator: "#3f4147",
-};
-
-// A styled menu item compatible with Discord native look.
-// Tries to use the native Button from ContextMenuContainer when available,
-// otherwise falls back to a styled TouchableOpacity.
-const SMBMenuItem = ({ label, onPress }: { label: string; onPress: () => void }) => {
-  const CtxButton = _ctxButtonComp || null;
-  if (CtxButton) {
-    // Use native Button - try common prop patterns
-    try {
-      return React.createElement(CtxButton, {
-        label,
-        onPress,
-        key: label,
-      });
-    } catch {}
-    try {
-      return React.createElement(CtxButton, {
-        children: label,
-        onPress,
-        key: label,
-      });
-    } catch {}
+// Check if any existing items look like separators
+function findSeparatorItem(items: any[]): any {
+  for (const item of items) {
+    if (!React.isValidElement(item)) continue;
+    const props = item.props || {};
+    // View with very thin height or backgroundColor-only style = separator
+    if (props.style?.height === 1 || props.style?.marginVertical === 1 || props.style?.marginVertical === 2) {
+      return item;
+    }
   }
-  // Fallback: styled TouchableOpacity
-  return React.createElement(
-    TouchableOpacity,
-    {
-      onPress,
-      style: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: "transparent",
-      },
-    },
-    React.createElement(Text, {
-      style: {
-        color: SMBMenuColors.text,
-        fontSize: 14,
-        fontFamily: "ggsans",
-        fontWeight: "400",
-        flex: 1,
-        paddingLeft: 4,
-      }
-    }, label),
-  );
-};
+  return null;
+}
 function findNameplateComponents(): any[] {
   const results: any[] = [];
   const seen = new Set<any>();
@@ -553,22 +491,31 @@ function tryInject(items: any[], ctx: any): boolean {
     const hasReactElements = items.some((i: any) => React.isValidElement(i));
     
     if (hasReactElements) {
-      // Items are React elements - create proper elements for our additions
-      // Use a View as a separator
-      items.push(
-        React.createElement(View, {
-          key: "smb-separator",
-          style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 }
-        })
-      );
-      for (const add of additions) {
+      // Find any React element from existing items to use as component template
+      const template = items.find(i => React.isValidElement(i));
+      if (!template) return false;
+      
+      // Clone a separator from existing items if possible, otherwise create one
+      const existingSep = findSeparatorItem(items);
+      if (existingSep) {
+        items.push(React.cloneElement(existingSep, { key: "smb-sep" }));
+      } else {
         items.push(
-          React.createElement(SMBMenuItem, {
-            key: add.id,
-            label: add.label,
-            onPress: () => add.action(),
+          React.createElement(View, {
+            key: "smb-sep",
+            style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 }
           })
         );
+      }
+      
+      // Clone the template item for each addition, replacing children/label and onPress
+      for (const add of additions) {
+        const cloned = React.cloneElement(template, {
+          key: add.id,
+          children: add.label,
+          onPress: () => add.action(),
+        });
+        items.push(cloned);
       }
       return true;
     }
@@ -916,7 +863,7 @@ export function getDiagnostics(): string[] {
 }
 
 export function patchComponents(): Unpatch {
-  try { initCtxComponents(); } catch {}
+
   const un: Unpatch[] = [];
   const safe = (label: string, fn: () => Unpatch | void) => {
     try {
