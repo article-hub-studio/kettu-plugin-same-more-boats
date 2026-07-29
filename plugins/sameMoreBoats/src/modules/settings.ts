@@ -3,7 +3,7 @@ import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
 import { registerCommand } from "@vendetta/commands";
 import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
 import { connectToDebugger } from "@vendetta/debug";
-import { getDiagnostics, getCtxModuleScan } from "./components";
+import { getDiagnostics, getCtxModuleScan, resetTrackedCtx, getTrackedCtx } from "./components";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -129,6 +129,10 @@ export function registerSmbCommand(): () => void {
             } catch {}
             if (!lines.length) lines.push("Scan returned no results");
             return { content: lines.join("\n") };
+          if (action === "reset") {
+            try { if (resetTrackedCtx) resetTrackedCtx(); } catch {}
+            return { content: "Tracked context reset" };
+          }
           }
           const lines = [
             "**Same More Boats**",
@@ -138,6 +142,7 @@ export function registerSmbCommand(): () => void {
             "`/smb url <ws://...>` \u2014 Save DevTools URL",
             "`/smb status` \u2014 Show diagnostics",
             "`/smb scan` \u2014 Scan context-menu modules",
+            "`/smb reset` \u2014 Reset tracked message context",
             "",
             "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];
