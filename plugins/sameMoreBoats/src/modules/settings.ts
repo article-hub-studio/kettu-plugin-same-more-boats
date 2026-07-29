@@ -25,7 +25,7 @@ export const DEFAULTS: SMBSettings = {
   serverSettings: false,
   groupedMembers: false,
   contextMenu: true,
-  devTools: false,
+  devTools: true,
   forceDesktopLayout: false,
   recon: false,
   devtoolsUrl: "",
