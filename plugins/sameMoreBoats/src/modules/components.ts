@@ -185,6 +185,27 @@ function findSeparatorItem(items: any[]): any {
   }
   return null;
 }
+
+// Best-effort Discord asset/icon discovery for context menu items.
+// We avoid hardcoding remote URLs; this only inspects bundle-known components.
+function resolveMenuIcon(label: string): any {
+  try {
+    const lower = label.toLowerCase();
+    // Common icon asset prefixes used in Discord mobile builds
+    const iconNames = [
+      "CopyIcon", "LinkIcon", "MessageIcon", "UserIcon", "ChannelIcon", "GuildIcon", "MoreIcon", "MenuIcon", "InfoIcon", "CheckIcon", "TickIcon"
+    ];
+    for (const name of iconNames) {
+      try {
+        const comp = findByName(name, false);
+        if (typeof comp === "function") return comp;
+      } catch {}
+    }
+    const imgMod = safeFind("menuImage", () => findByProps("Image"));
+    if (imgMod?.Image) return imgMod.Image;
+  } catch {}
+  return null;
+}
 function findNameplateComponents(): any[] {
   const results: any[] = [];
   const seen = new Set<any>();
@@ -491,31 +512,80 @@ function tryInject(items: any[], ctx: any): boolean {
     const hasReactElements = items.some((i: any) => React.isValidElement(i));
     
     if (hasReactElements) {
-      // Find any React element from existing items to use as component template
-      const template = items.find(i => React.isValidElement(i));
-      if (!template) return false;
+      // Prefer Discord-native menu item construction when possible.
+      // Many mobile context menus here render React elements directly, so
+      // cloning arbitrary elements often loses the original button styling.
+      const ctxMod = safeFind("ctxMenu.container", () => findByProps("ContextMenuContainer"));
+      const NativeButton = ctxMod?.Button || null;
+      const iconMod = safeFind("ctxMenu.image", () => findByProps("Image"));
+      const NativeImage = iconMod?.Image || null;
+      const separatorStyle = { height: 1, backgroundColor: "#3f4147", marginVertical: 4 };
       
-      // Clone a separator from existing items if possible, otherwise create one
+      // Try to reuse an existing separator element style when available
       const existingSep = findSeparatorItem(items);
       if (existingSep) {
         items.push(React.cloneElement(existingSep, { key: "smb-sep" }));
       } else {
-        items.push(
-          React.createElement(View, {
-            key: "smb-sep",
-            style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 }
-          })
-        );
+        items.push(React.createElement(View, { key: "smb-sep", style: separatorStyle }));
       }
       
-      // Clone the template item for each addition, replacing children/label and onPress
       for (const add of additions) {
-        const cloned = React.cloneElement(template, {
-          key: add.id,
-          children: add.label,
-          onPress: () => add.action(),
-        });
-        items.push(cloned);
+        const iconComp = resolveMenuIcon(add.label);
+        if (NativeButton) {
+          // Use the native context menu button so styling stays identical
+          try {
+            const icon = iconComp ? React.createElement(iconComp, { key: "icon", size: 16, color: "#dcddde" }) : null;
+            items.push(
+              React.createElement(NativeButton, {
+                key: add.id,
+                label: add.label,
+                leftAccessory: icon,
+                onPress: () => add.action(),
+              })
+            );
+            continue;
+          } catch {}
+          try {
+            const icon = iconComp ? React.createElement(iconComp, { key: "icon", size: 16, color: "#dcddde" }) : null;
+            items.push(
+              React.createElement(NativeButton, {
+                key: add.id,
+                children: add.label,
+                leftAccessory: icon,
+                onPress: () => add.action(),
+              })
+            );
+            continue;
+          } catch {}
+        }
+        
+        // Fallback: clone an existing item, but preserve label/onPress cleanly
+        const template = items.find((i: any) => React.isValidElement(i)) || null;
+        const fallbackIcon = resolveMenuIcon(add.label) || null;
+        if (template) {
+          items.push(
+            React.cloneElement(template, {
+              key: add.id,
+              children: add.label,
+              onPress: () => add.action(),
+            })
+          );
+        } else {
+          const children = fallbackIcon
+            ? [React.createElement(fallbackIcon, { key: "icon", size: 16, color: "#dcddde" }), React.createElement(Text, { key: "label", style: { color: "#dcddde", fontSize: 14, marginLeft: 6 } }, add.label)]
+            : React.createElement(Text, { style: { color: "#dcddde", fontSize: 14 } }, add.label);
+          items.push(
+            React.createElement(
+              TouchableOpacity,
+              {
+                key: add.id,
+                onPress: () => add.action(),
+                style: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
+              },
+              children
+            )
+          );
+        }
       }
       return true;
     }
