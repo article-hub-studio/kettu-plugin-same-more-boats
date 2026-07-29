@@ -1,4 +1,4 @@
-import { React, ReactNative } from "@vendetta/metro/common";
+import { React, ReactNative, FluxDispatcher } from "@vendetta/metro/common";
 import {
   find,
   findByName,
@@ -232,129 +232,220 @@ function patchMessageAuthor(): Unpatch | void {
   return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
 
-function patchContextMenuItems(): Unpatch | void {
-  const finderKeys = [
-    "buildMessageContextMenuItems", "buildContextMenuItems", "menuItems",
-    "getMessageContextMenus", "openContextMenu", "buildMenu", "getMenuItems",
-    "ContextMenuContainer", "MenuContainer", "ActionSheetPresenter",
-  ];
-  let targetMod: any = null;
-  let targetFnName: string | null = null;
+function buildContextMenuAdditions(ctx: any): any[] {
+  const additions: any[] = [];
+  try {
+    const target = ctx.message ?? ctx.user ?? ctx.channel ?? ctx;
+    const message = ctx.message ?? ctx;
+    const user = ctx.user ?? ctx.author ?? (ctx.message?.author);
+    const channel = ctx.channel;
 
-  for (const k of finderKeys) {
+    if (target?.id) {
+      additions.push({
+        label: "Copy ID",
+        id: "smb-copy-id",
+        action: () => {
+          if (copyText(String(target.id))) toast("Copied ID: " + target.id);
+        },
+      });
+    }
+    if (message?.id && (ctx.channelId || channel?.id)) {
+      const chId = ctx.channelId || channel?.id || "@me";
+      additions.push({
+        label: "Copy Message Link",
+        id: "smb-copy-link",
+        action: () => {
+          const guild = ctx.guildId ? `${ctx.guildId}/` : "@me/";
+          if (copyText(`https://discord.com/channels/${guild}${chId}/${message.id}`))
+            toast("Message link copied");
+        },
+      });
+    }
+    if (message?.content) {
+      additions.push({
+        label: "Copy Raw Message",
+        id: "smb-copy-raw",
+        action: () => {
+          if (copyText(message.content)) toast("Raw message copied");
+        },
+      });
+    }
+    if (user?.id) {
+      additions.push({
+        label: "Copy User ID",
+        id: "smb-copy-user-id",
+        action: () => {
+          if (copyText(String(user.id))) toast("User ID copied");
+        },
+      });
+      additions.push({
+        label: "Copy Username",
+        id: "smb-copy-username",
+        action: () => {
+          const uname = user.username + (user.discriminator ? "#" + user.discriminator : "");
+          if (copyText(uname)) toast("Username copied");
+        },
+      });
+    }
+    if ((channel?.id || ctx.channelId) && !message?.id) {
+      const chId = channel?.id || ctx.channelId;
+      additions.push({
+        label: "Copy Channel ID",
+        id: "smb-copy-channel-id",
+        action: () => {
+          if (copyText(String(chId))) toast("Channel ID copied");
+        },
+      });
+    }
+  } catch (e) {
+    log("buildAdditions FAIL", e);
+  }
+  return additions;
+}
+
+function hasDupeItem(items: any[], addition: any): boolean {
+  if (!addition?.id) return false;
+  return items.some((i: any) => i?.id === addition.id);
+}
+
+function injectAdditions(items: any[], ctx: any): boolean {
+  if (!Array.isArray(items)) return false;
+  const additions = buildContextMenuAdditions(ctx);
+  if (!additions.length) return false;
+  // Check we haven't already added our items
+  if (additions.some((a) => hasDupeItem(items, a))) return false;
+  additions.unshift({ type: "divider", id: "smb-divider" });
+  items.push(...additions);
+  return true;
+}
+
+function patchContextMenuItems(): Unpatch | void {
+  const unpatches: (() => void)[] = [];
+  let patched = false;
+
+  // Strategy 1: Try finding a builder function and use after() to add items
+  const builderKeys = [
+    "buildMessageContextMenuItems", "buildContextMenuItems", "menuItems",
+    "getMessageContextMenus", "buildMenu", "getMenuItems",
+    "getBuiltMenuItems", "createContextMenu", "buildMessageMenu",
+    "getLongPressItems", "getMessageMenuItems", "buildActionSheetItems",
+    "getContextMenuItems", "getMenuForMessage", "getActionsForMessage",
+  ];
+
+  for (const k of builderKeys) {
+    if (patched) break;
     const mod = safeFind("ctx:" + k, () => findByProps(k));
     if (mod && typeof mod[k] === "function") {
-      targetMod = mod;
-      targetFnName = k;
-      break;
+      log("ContextMenu: builder via", k);
+      unpatches.push(
+        (after as any)(k, mod, (args: any[], ret: any) => {
+          try {
+            if (!Array.isArray(ret)) return ret;
+            const ctx = args?.[0] ?? {};
+            const additions = buildContextMenuAdditions(ctx);
+            if (!additions.length) return ret;
+            additions.unshift({ type: "divider", id: "smb-divider" });
+            return [...ret, ...additions];
+          } catch (e) {
+            log("contextMenu builder FAIL", e);
+            return ret;
+          }
+        })
+      );
+      patched = true;
     }
   }
 
-  if (!targetMod || !targetFnName) {
-    try {
-      const mod = find((m: any) => {
-        if (!m || typeof m !== "object") return false;
-        for (const k of Object.keys(m)) {
-          if (typeof m[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
-            return true;
+  // Strategy 2: Intercept openContextMenu (confirmed FOUND) — use after()
+  // to modify the items array on the config before the menu renders
+  if (!patched) {
+    const openCtx = safeFind("openContextMenu", () => findByProps("openContextMenu"));
+    if (openCtx && typeof openCtx.openContextMenu === "function") {
+      log("ContextMenu: using openContextMenu");
+      unpatches.push(
+        (before as any)("openContextMenu", openCtx, (args: any[]) => {
+          try {
+            const config = args[0];
+            if (!config) return;
+            // Try each possible item container
+            const candidates = [
+              [config.items, config],
+              [config.menuItems, config],
+              [config.rows, config],
+              [config.options, config],
+              [config.actions, config],
+              [config.data?.items, config.data ?? config],
+              [config.data?.menuItems, config.data ?? config],
+            ];
+            for (const [items, ctx] of candidates) {
+              if (injectAdditions(items, ctx)) break;
+            }
+          } catch (e) {
+            log("ctx openContextMenu FAIL", e);
           }
-        }
-        return false;
-      });
-      if (mod) {
-        for (const k of Object.keys(mod)) {
-          if (typeof mod[k] === "function" && /context.?menu|menuItems|buildMenu|getMenuItems|openMenu/i.test(k)) {
-            targetMod = mod;
-            targetFnName = k;
-            break;
-          }
-        }
-      }
-    } catch (e) { log("ctx filter find FAIL", e); }
+        })
+      );
+      // Mark as patched even if before doesn't find items — it's our best shot
+      patched = true;
+    }
   }
 
-  if (!targetMod || !targetFnName) {
-    log("ContextMenu: no builder found");
+  // Strategy 3: Flux intercept — watch for context-menu-bearing actions
+  if (!patched) {
+    try {
+      if (FluxDispatcher && typeof FluxDispatcher.dispatch === "function") {
+        log("ContextMenu: using Flux dispatch intercept");
+        unpatches.push(
+          (before as any)("dispatch", FluxDispatcher, (args: any[]) => {
+            try {
+              const action = args?.[0];
+              if (!action?.type) return;
+              if (!/CONTEXT_MENU|LONG_PRESS/i.test(action.type)) return;
+              const candidates = [
+                [action.items, action],
+                [action.menuItems, action],
+                [action.options, action],
+              ];
+              for (const [items, ctx] of candidates) {
+                if (injectAdditions(items, ctx)) break;
+              }
+            } catch {}
+          })
+        );
+      }
+    } catch {}
+  }
+
+  // Strategy 4: Patch ContextMenuContainer component (also FOUND)
+  if (!patched) {
+    const ctxContainerMod = safeFind("ContextMenuContainer", () => findByProps("ContextMenuContainer"));
+    const ctxContainer = ctxContainerMod?.ContextMenuContainer;
+    if (ctxContainer) {
+      log("ContextMenu: using ContextMenuContainer patch");
+      const un = patchComponentRender(ctxContainer, "ctxContainer", (_args: any[], ret: any) => {
+        try {
+          const props = _args?.[0] ?? {};
+          for (const key of ["items", "menuItems", "children", "data"]) {
+            if (Array.isArray(props[key])) {
+              injectAdditions(props[key], props);
+              break;
+            }
+          }
+        } catch {}
+        return ret;
+      });
+      if (typeof un === "function") { unpatches.push(un); patched = true; }
+    }
+  }
+
+  if (!unpatches.length) {
+    log("ContextMenu: no patching method found");
     return;
   }
 
-  log("ContextMenu builder found:", targetFnName);
-
-  return (after as any)(targetFnName, targetMod, (args: any[], ret: any) => {
-    try {
-      if (!Array.isArray(ret)) return ret;
-      const ctx = args?.[0] ?? {};
-      const target = ctx.message ?? ctx.user ?? ctx.channel;
-      const additions: any[] = [];
-
-      if (target?.id) {
-        additions.push({
-          label: "Copy ID",
-          id: "smb-copy-id",
-          action: () => {
-            if (copyText(String(target.id))) toast("Copied ID: " + target.id);
-          },
-        });
-      }
-      if (ctx.message?.id && ctx.channelId) {
-        additions.push({
-          label: "Copy Message Link",
-          id: "smb-copy-link",
-          action: () => {
-            const guild = ctx.guildId ? `${ctx.guildId}/` : "@me/";
-            if (copyText(`https://discord.com/channels/${guild}${ctx.channelId}/${ctx.message.id}`))
-              toast("Message link copied");
-          },
-        });
-      }
-      if (ctx.message?.content) {
-        additions.push({
-          label: "Copy Raw Message",
-          id: "smb-copy-raw",
-          action: () => {
-            if (copyText(ctx.message.content)) toast("Raw message copied");
-          },
-        });
-      }
-      if (ctx.user?.id) {
-        additions.push({
-          label: "Copy User ID",
-          id: "smb-copy-user-id",
-          action: () => {
-            if (copyText(String(ctx.user.id))) toast("User ID copied");
-          },
-        });
-        additions.push({
-          label: "Copy Username",
-          id: "smb-copy-username",
-          action: () => {
-            const uname = ctx.user.username + (ctx.user.discriminator ? "#" + ctx.user.discriminator : "");
-            if (copyText(uname)) toast("Username copied");
-          },
-        });
-      }
-      if (ctx.channel?.id) {
-        additions.push({
-          label: "Copy Channel ID",
-          id: "smb-copy-channel-id",
-          action: () => {
-            if (copyText(String(ctx.channel.id))) toast("Channel ID copied");
-          },
-        });
-      }
-
-      if (additions.length) {
-        additions.unshift({ type: "divider", id: "smb-divider" });
-        return [...ret, ...additions];
-      }
-      return ret;
-    } catch (e) {
-      log("contextMenu render FAIL", e);
-      return ret;
-    }
-  });
+  log("ContextMenu: patched with", unpatches.length, "strategies");
+  return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
-
 function patchDeveloperMode(): Unpatch | void {
   try {
     const store = safeFind("DeveloperModeStore", () => findByStoreName("DeveloperModeStore"));
