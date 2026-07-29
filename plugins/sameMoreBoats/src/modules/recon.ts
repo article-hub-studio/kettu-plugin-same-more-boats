@@ -7,12 +7,34 @@ import {
   findByNameAll,
   findByStoreName,
 } from "@vendetta/metro";
+import { ReactNative } from "@vendetta/metro/common";
 import { showConfirmationAlert } from "@vendetta/ui/alerts";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
 function safe<T>(fn: () => T): T | null {
   try { return fn(); } catch { return null; }
+}
+
+function showModal(title: string, content: string) {
+  try {
+    ReactNative.Alert.alert(title, content, [{ text: "OK" }], { cancelable: true });
+    return;
+  } catch {}
+  try {
+    showConfirmationAlert({
+      title,
+      content,
+      confirmText: "OK",
+      isDismissable: true,
+      onConfirm: () => {},
+      onCancel: () => {},
+    });
+    return;
+  } catch (e) {
+    log("recon modal FAIL", e);
+  }
+  log("RECON:", title, content);
 }
 
 export function runRecon(): void {
@@ -83,16 +105,5 @@ export function runRecon(): void {
 
   log("recon v2 done:", lines.length, "lines");
   const body = lines.join("\n");
-  try {
-    (showConfirmationAlert as any)({
-      title: `SMB recon`,
-      content: body,
-      confirmText: "OK",
-      isDismissable: true,
-      onConfirm: () => {},
-    });
-  } catch (e) {
-    log("recon modal FAIL", e);
-    lines.forEach((l) => log("RECON:", l));
-  }
+  showModal("SMB recon", body);
 }
