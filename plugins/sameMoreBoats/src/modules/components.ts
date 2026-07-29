@@ -214,6 +214,13 @@ const SMBMenuItem = ({ label, onPress }: { label: string; onPress: () => void })
         key: label,
       });
     } catch {}
+    try {
+      return React.createElement(CtxButton, {
+        children: label,
+        onPress,
+        key: label,
+      });
+    } catch {}
   }
   // Fallback: styled TouchableOpacity
   return React.createElement(
@@ -235,6 +242,7 @@ const SMBMenuItem = ({ label, onPress }: { label: string; onPress: () => void })
         fontFamily: "ggsans",
         fontWeight: "400",
         flex: 1,
+        paddingLeft: 4,
       }
     }, label),
   );
