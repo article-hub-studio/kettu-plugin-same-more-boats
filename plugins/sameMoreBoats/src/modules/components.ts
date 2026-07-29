@@ -464,10 +464,36 @@ function tryInject(items: any[], ctx: any): boolean {
       return changed;
     }
 
-    // Object items - standard format
+    // Check if existing items are React elements (rendered directly as children)
+    const hasReactElements = items.some((i: any) => React.isValidElement(i));
+    
+    if (hasReactElements) {
+      // Items are React elements - create proper elements for our additions
+      // Use a View as a separator instead of an object with type key
+      items.push(
+        React.createElement(View, {
+          key: "smb-separator",
+          style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 }
+        })
+      );
+      for (const add of additions) {
+        items.push(
+          React.createElement(TouchableOpacity, {
+            key: add.id,
+            onPress: () => add.action(),
+            style: { paddingHorizontal: 16, paddingVertical: 12 }
+          },
+            React.createElement(Text, {
+              style: { color: "#dcddde", fontSize: 14 }
+            }, add.label)
+          )
+        );
+      }
+      return true;
+    }
+
+    // Plain object items (processed by a builder before rendering - no React crash)
     if (additions.some((a: any) => hasDupeItem(items, a))) return false;
-    // Insert divider then additions
-    items.push({ type: "divider", id: "smb-divider" });
     items.push(...additions);
     return true;
   } catch (e) { log("tryInject FAIL", e); return false; }
