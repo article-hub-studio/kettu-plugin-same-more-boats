@@ -435,6 +435,143 @@ function patchContextMenuItems(): Unpatch | void {
         return ret;
       });
       if (typeof un === "function") { unpatches.push(un); patched = true; }
+
+  // Strategy 5: Intercept showContextMenu (confirmed in scan)
+  if (!patched) {
+    const showCtxMod = safeFind("showContextMenu", () => findByProps("showContextMenu"));
+    if (showCtxMod && typeof showCtxMod.showContextMenu === "function") {
+      log("ContextMenu: using showContextMenu intercept");
+      unpatches.push(
+        (instead as any)("showContextMenu", showCtxMod, (args: any[], orig: Function) => {
+          try {
+            const config = args[1] ?? args[0] ?? {};
+            for (const key of ["items", "menuItems", "rows", "options", "actions"]) {
+              if (Array.isArray(config[key])) {
+                if (injectAdditions(config[key], config)) break;
+              }
+            }
+            if (config.data) {
+              for (const key of ["items", "menuItems"]) {
+                if (Array.isArray(config.data[key])) {
+                  if (injectAdditions(config.data[key], config.data)) break;
+                }
+              }
+            }
+          } catch (e) {
+            log("ctx showContextMenu FAIL", e);
+          }
+          return orig(...args);
+        })
+      );
+      patched = true;
+    }
+  }
+
+  // Strategy 6: Patch updateContextMenuState
+  if (!patched) {
+    const showCtxMod = safeFind("showContextMenu", () => findByProps("showContextMenu"));
+    if (showCtxMod && typeof showCtxMod.updateContextMenuState === "function") {
+      log("ContextMenu: using updateContextMenuState");
+      unpatches.push(
+        (after as any)("updateContextMenuState", showCtxMod, (args: any[], ret: any) => {
+          try {
+            const stateUpdate = args[0] ?? {};
+            for (const key of ["items", "menuItems", "rows"]) {
+              if (Array.isArray(stateUpdate[key])) {
+                injectAdditions(stateUpdate[key], stateUpdate);
+                break;
+              }
+            }
+          } catch (e) {
+            log("ctx updateContextMenuState FAIL", e);
+          }
+          return ret;
+        })
+      );
+      patched = true;
+    }
+  }
+
+  // Strategy 7: Intercept showActionSheet
+  if (!patched) {
+    const actionMod = safeFind("showActionSheet", () => findByProps("showActionSheet"));
+    if (actionMod && typeof actionMod.showActionSheet === "function") {
+      log("ContextMenu: using showActionSheet");
+      unpatches.push(
+        (before as any)("showActionSheet", actionMod, (args: any[]) => {
+          try {
+            const config = args[0] ?? {};
+            for (const key of ["items", "options", "menuItems"]) {
+              if (Array.isArray(config[key])) {
+                injectAdditions(config[key], config);
+                break;
+              }
+            }
+          } catch (e) {
+            log("ctx showActionSheet FAIL", e);
+          }
+        })
+      );
+      patched = true;
+    }
+    if (!patched && actionMod && typeof actionMod.default === "function") {
+      log("ContextMenu: using ActionSheet default");
+      const orig = actionMod.default;
+      actionMod.default = function (...a: any[]) {
+        try {
+          const config = a[0] ?? {};
+          for (const key of ["items", "options", "menuItems"]) {
+            if (Array.isArray(config[key])) {
+              injectAdditions(config[key], config);
+              break;
+            }
+          }
+        } catch {}
+        return orig.apply(this, a);
+      };
+      unpatches.push(() => { actionMod.default = orig; });
+      patched = true;
+    }
+  }
+
+  // Strategy 8: Patch ContextMenuStore getState
+  if (!patched) {
+    const showCtxMod = safeFind("showContextMenu", () => findByProps("showContextMenu"));
+    const store = showCtxMod?.ContextMenuStore;
+    if (store && typeof store.getState === "function") {
+      log("ContextMenu: using ContextMenuStore");
+      const origGet = store.getState.bind(store);
+      store.getState = function () {
+        const state = origGet();
+        try {
+          if (state?.items && Array.isArray(state.items)) {
+            const additions = buildContextMenuAdditions(state);
+            if (additions.length && !hasDupeItem(state.items, additions[0])) {
+              additions.unshift({ type: "divider", id: "smb-divider" });
+              state.items = [...state.items, ...additions];
+            }
+          }
+        } catch {}
+        return state;
+      };
+      unpatches.push(() => { store.getState = origGet; });
+      patched = true;
+    }
+  }
+
+  // Strategy 9: Patch BottomSheet
+  if (!patched) {
+    const bsMod = safeFind("BottomSheet", () => findByProps("BottomSheet"));
+    if (bsMod?.BottomSheet) {
+      log("ContextMenu: using BottomSheet patch");
+      const un = patchComponentRender(bsMod.BottomSheet, "bottomSheet", (a: any[], r: any) => {
+        try { const p = a?.[0] ?? {}; for (const k of ["items","children","rows"]) { if (Array.isArray(p[k])) { injectAdditions(p[k], p); break; } } } catch {}
+        return r;
+      });
+      if (typeof un === "function") { unpatches.push(un); patched = true; }
+    }
+  }
+
     }
   }
 
@@ -466,6 +603,10 @@ function diagnostics(): string[] {
     ["ctxMenu.items", () => findByProps("menuItems")],
     ["ctxMenu.open", () => findByProps("openContextMenu")],
     ["ctxMenu.container", () => findByProps("ContextMenuContainer")],
+    ["ctxMenu.showCtxMenu", () => findByProps("showContextMenu")],
+    ["ctxMenu.showActionSheet", () => findByProps("showActionSheet")],
+    ["ctxMenu.updCtxState", () => findByProps("updateContextMenuState")],
+    ["ctxMenu.bottomSheet", () => findByProps("BottomSheet")],
     ["nameplate", () => findByName("Nameplate", false)],
     ["nameplateInner", () => findByName("NameplateInner", false)],
     ["username", () => findByName("Username", false)],
