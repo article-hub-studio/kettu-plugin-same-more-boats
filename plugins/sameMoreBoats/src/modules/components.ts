@@ -487,6 +487,58 @@ function diagnostics(): string[] {
   return out;
 }
 
+// Deep scan: find ALL modules with context-menu related properties
+function findCtxModules(): [string, any][] {
+  const results: [string, any][] = [];
+  const seen = new Set<any>();
+
+  // Check specific property names used across Discord builds
+  const props = [
+    "openContextMenu", "closeContextMenu", "showContextMenu",
+    "contextMenuActions", "buildMessageContextMenuItems",
+    "buildContextMenuItems", "getContextMenuItems",
+    "getMessageContextMenuItems", "getMenuItems",
+    "buildMenuItems", "createContextMenu",
+    "MessageContextMenu", "ContextMenuContainer",
+    "ContextMenu", "ActionSheet", "ActionSheetPresenter",
+    "BottomSheet", "menuItems", "contextMenu",
+    "showActionSheet", "dismissActionSheet",
+    "getLongPressItems", "getMessageMenuItems",
+    "getBuiltMenuItems", "buildMessageMenu",
+    "getActionsForMessage", "getMenuForMessage",
+    "getRows", "getSections",
+  ];
+
+  for (const p of props) {
+    try {
+      const mod = findByProps(p);
+      if (mod && !seen.has(mod)) {
+        seen.add(mod);
+        // Find all function names in this module
+        const fns: string[] = [];
+        for (const k of Object.keys(mod)) {
+          if (typeof mod[k] === "function") fns.push(k);
+        }
+        results.push([p, { moduleKeys: Object.keys(mod).slice(0, 20), functions: fns.slice(0, 15) }]);
+      }
+    } catch {}
+  }
+
+  return results;
+}
+
+export function getCtxModuleScan(): string[] {
+  const out: string[] = [];
+  const modules = findCtxModules();
+  out.push(`Found ${modules.length} context-menu related modules:`);
+  for (const [prop, info] of modules) {
+    out.push(`  via "${prop}": keys=[${info.moduleKeys.join(", ")}]`);
+    if (info.functions.length) {
+      out.push(`    fns=[${info.functions.join(", ")}]`);
+    }
+  }
+  return out;
+}
 export function getDiagnostics(): string[] {
   return diagnostics();
 }

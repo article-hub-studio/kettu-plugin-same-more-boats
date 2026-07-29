@@ -3,7 +3,7 @@ import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
 import { registerCommand } from "@vendetta/commands";
 import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
 import { connectToDebugger } from "@vendetta/debug";
-import { getDiagnostics } from "./components";
+import { getDiagnostics, getCtxModuleScan } from "./components";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -81,8 +81,8 @@ export function registerSmbCommand(): () => void {
         {
           name: "action",
           displayName: "action",
-          description: "connect / url / status",
-          displayDescription: "connect / url / status",
+          description: "connect / url / status / scan",
+          displayDescription: "connect / url / status / scan",
           type: 3,
           required: false,
         },
@@ -122,6 +122,14 @@ export function registerSmbCommand(): () => void {
             lines.push("DevTools URL: " + (settings.devtoolsUrl || "(none)"));
             return { content: lines.join("\n") };
           }
+          if (action === "scan") {
+            const lines: string[] = [];
+            try {
+              if (getCtxModuleScan) lines.push(...getCtxModuleScan());
+            } catch {}
+            if (!lines.length) lines.push("Scan returned no results");
+            return { content: lines.join("\n") };
+          }
           const lines = [
             "**Same More Boats**",
             "",
@@ -129,6 +137,7 @@ export function registerSmbCommand(): () => void {
             "`/smb connect <ws://...>` \u2014 Connect React DevTools",
             "`/smb url <ws://...>` \u2014 Save DevTools URL",
             "`/smb status` \u2014 Show diagnostics",
+            "`/smb scan` \u2014 Scan context-menu modules",
             "",
             "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];
