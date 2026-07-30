@@ -362,6 +362,17 @@ function patchMessageAuthor(): Unpatch | void {
   return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
 
+// Convert a Discord snowflake ID to its creation Date (PC-only info surfaced
+// on mobile). Low bits are irrelevant for a millisecond timestamp.
+function snowflakeToDate(id: string): Date | null {
+  try {
+    if (!id || !/^\d+$/.test(id)) return null;
+    const ms = Math.floor(Number(id) / 4194304) + 1420070400000;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d;
+  } catch { return null; }
+}
+
 function buildContextMenuAdditions(ctx: any): any[] {
   const additions: any[] = [];
   try {
@@ -428,6 +439,56 @@ function buildContextMenuAdditions(ctx: any): any[] {
           },
         });
       }
+    }
+
+    // --- PC-only features brought to mobile ---
+
+    // Copy Avatar URL (desktop right-click "Copy Image" equivalent)
+    if (userId && user?.avatar) {
+      additions.push({
+        label: "Copy Avatar URL",
+        id: "smb-copy-avatar",
+        action: () => {
+          const ext = String(user.avatar).indexOf("a_") === 0 ? "gif" : "png";
+          const url = `https://cdn.discordapp.com/avatars/${userId}/${user.avatar}.${ext}?size=1024`;
+          if (copyText(url)) toast("Avatar URL copied");
+        },
+      });
+    }
+
+    // Copy Account Creation Date (from user snowflake)
+    if (userId) {
+      additions.push({
+        label: "Copy Account Created Date",
+        id: "smb-copy-created",
+        action: () => {
+          const d = snowflakeToDate(String(userId));
+          if (d && copyText(d.toISOString())) toast("Created: " + d.toUTCString());
+          else toast("Could not resolve creation date");
+        },
+      });
+    }
+
+    // Copy Message JSON (desktop dev feature)
+    if (message?.id) {
+      additions.push({
+        label: "Copy Message JSON",
+        id: "smb-copy-json",
+        action: () => {
+          try {
+            const clean = {
+              id: message.id,
+              channel_id: message.channel_id ?? channelId,
+              author: message.author ? { id: message.author.id, username: message.author.username } : undefined,
+              content: message.content,
+              timestamp: message.timestamp,
+              attachments: message.attachments,
+              embeds: message.embeds,
+            };
+            if (copyText(JSON.stringify(clean, null, 2))) toast("Message JSON copied");
+          } catch (e) { toast("Could not serialize message"); }
+        },
+      });
     }
 
     // Copy Channel ID
@@ -541,20 +602,55 @@ function captureItemShape(el: any) {
   } catch (e) { log("captureItemShape FAIL", e); }
 }
 
-// Pick the best template row: a real menu item (not a separator/header/View).
-function pickNativeTemplate(items: any[]): any {
-  let fallback: any = null;
+// Determine whether an element looks like a "group" wrapping several rows
+// (e.g. Discord's ActionSheetRowGroup) rather than a single row.
+function isRowGroup(el: any): boolean {
+  if (!React.isValidElement(el)) return false;
+  const type: any = (el as any).type;
+  const name = type?.displayName || type?.name || "";
+  if (/RowGroup|Group|Section/i.test(name)) return true;
+  const kids = (el as any).props?.children;
+  return Array.isArray(kids) && kids.filter((k: any) => React.isValidElement(k)).length > 1;
+}
+
+// Determine whether an element is a thin separator view.
+function isSeparator(el: any): boolean {
+  if (!React.isValidElement(el)) return false;
+  const style: any = (el as any).props?.style;
+  return style?.height === 1 || style?.marginVertical === 1 || style?.marginVertical === 2;
+}
+
+// Recurse to find a single leaf menu row (has a press handler and/or label,
+// but is not itself a group of rows).
+function findRowTemplate(items: any[]): any {
+  const visit = (nodes: any[], depth: number): any => {
+    for (const node of nodes) {
+      if (!React.isValidElement(node)) continue;
+      if (isSeparator(node)) continue;
+      const props: any = (node as any).props || {};
+      if (isRowGroup(node) && depth < 4) {
+        const kids = Array.isArray(props.children) ? props.children : [props.children];
+        const found = visit(kids, depth + 1);
+        if (found) return found;
+        continue;
+      }
+      // Leaf row: has a press handler or a text prop.
+      if (typeof props.onPress === "function" || typeof props.onSelect === "function"
+          || props.label != null || props.title != null) {
+        return node;
+      }
+    }
+    return null;
+  };
+  return visit(items, 0);
+}
+
+// Find a group wrapper element we can clone to host our rows.
+function findGroupTemplate(items: any[]): any {
   for (const item of items) {
-    if (!React.isValidElement(item)) continue;
-    const props: any = (item as any).props || {};
-    // Skip separators (thin views).
-    if (props.style?.height === 1 || props.style?.marginVertical === 1 || props.style?.marginVertical === 2) continue;
-    // Prefer rows that expose an onPress handler and a label/children.
-    if (typeof props.onPress === "function" || typeof props.onSelect === "function") return item;
-    if (props.label != null || props.title != null) { if (!fallback) fallback = item; }
-    if (!fallback) fallback = item;
+    if (isRowGroup(item)) return item;
   }
-  return fallback;
+  return null;
 }
 
 // Clone a native menu row, overriding only its label text, press handler and
@@ -631,6 +727,26 @@ function renderRowChildren(template: any, label: string): any {
   return React.createElement(Text, { style: { color: "#dbdee1", fontSize: 16 } }, label);
 }
 
+// Detect whether our SMB rows are already present in a React-element items
+// array (guards against duplicate injection from multiple patch strategies
+// and re-renders).
+function alreadyInjected(items: any[]): boolean {
+  const scan = (nodes: any[], depth: number): boolean => {
+    for (const node of nodes) {
+      if (!React.isValidElement(node)) continue;
+      const key = (node as any).key;
+      if (typeof key === "string" && (key.indexOf("smb-") === 0 || key === "smb-group")) return true;
+      const kids = (node as any).props?.children;
+      if (depth < 4 && kids) {
+        const arr = Array.isArray(kids) ? kids : [kids];
+        if (scan(arr, depth + 1)) return true;
+      }
+    }
+    return false;
+  };
+  return scan(items, 0);
+}
+
 // Try to inject additions into an items array. Handles both object items and string items.
 function tryInject(items: any[], ctx: any): boolean {
   if (!Array.isArray(items) || !items.length) return false;
@@ -663,33 +779,23 @@ function tryInject(items: any[], ctx: any): boolean {
     const hasReactElements = items.some((i: any) => React.isValidElement(i));
 
     if (hasReactElements) {
-      // Capture the shape of a real native menu row so we can diagnose it
-      // (no DevTools available on device) and clone it faithfully.
-      const template = pickNativeTemplate(items);
-      if (template) captureItemShape(template);
+      // Skip if our rows are already present (avoids duplicates).
+      if (alreadyInjected(items)) return false;
 
-      // Build a Discord-native separator by cloning an existing one if possible.
-      const existingSep = findSeparatorItem(items);
-      if (existingSep) {
-        items.push(React.cloneElement(existingSep, { key: "smb-sep" }));
-      } else {
-        items.push(
-          React.createElement(View, {
-            key: "smb-sep",
-            style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 },
-          }),
-        );
-      }
+      // Find a genuine leaf menu row to clone (inherits exact native styling)
+      // and the group wrapper it lives in, if any.
+      const rowTemplate = findRowTemplate(items);
+      const groupTemplate = findGroupTemplate(items);
+      if (rowTemplate) captureItemShape(rowTemplate);
 
+      // Build our replacement rows by cloning the native leaf row.
+      const builtRows: any[] = [];
       for (const add of additions) {
-        // Preferred path: clone a genuine native row so it inherits the exact
-        // Discord styling (row height, padding, ripple, text style).
-        if (template) {
-          const cloned = cloneNativeItem(template, add);
-          if (cloned) { items.push(cloned); continue; }
+        if (rowTemplate) {
+          const cloned = cloneNativeItem(rowTemplate, add);
+          if (cloned) { builtRows.push(cloned); continue; }
         }
-
-        // Last-resort custom row (only used if no template exists at all).
+        // Last-resort custom row (only when no native template is available).
         const iconComp = resolveMenuIcon(add.label);
         const children = iconComp
           ? [
@@ -697,7 +803,7 @@ function tryInject(items: any[], ctx: any): boolean {
               React.createElement(Text, { key: "label", style: { color: "#dbdee1", fontSize: 16, marginLeft: 12 } }, add.label),
             ]
           : React.createElement(Text, { style: { color: "#dbdee1", fontSize: 16 } }, add.label);
-        items.push(
+        builtRows.push(
           React.createElement(
             TouchableOpacity,
             {
@@ -708,6 +814,29 @@ function tryInject(items: any[], ctx: any): boolean {
             children,
           ),
         );
+      }
+
+      // If the menu groups rows (e.g. ActionSheetRowGroup), wrap ours in a
+      // cloned group so they render as a proper native section with divider.
+      if (groupTemplate) {
+        const groupProps: any = { ...((groupTemplate as any).props || {}) };
+        groupProps.key = "smb-group";
+        groupProps.children = builtRows;
+        items.push(React.cloneElement(groupTemplate, groupProps));
+      } else {
+        // No group wrapper: add a native-style separator then the rows.
+        const existingSep = findSeparatorItem(items);
+        if (existingSep) {
+          items.push(React.cloneElement(existingSep, { key: "smb-sep" }));
+        } else {
+          items.push(
+            React.createElement(View, {
+              key: "smb-sep",
+              style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 },
+            }),
+          );
+        }
+        for (const row of builtRows) items.push(row);
       }
       return true;
     }
