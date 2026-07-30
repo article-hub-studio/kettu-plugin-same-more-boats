@@ -3,7 +3,7 @@ import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
 import { registerCommand } from "@vendetta/commands";
 import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
 import { connectToDebugger } from "@vendetta/debug";
-import { getDiagnostics, getCtxModuleScan, resetTrackedCtx, getTrackedCtx, getItemShape } from "./components";
+import { getDiagnostics, getCtxModuleScan, resetTrackedCtx, getTrackedCtx, getItemShape, getSeenLazyKeys } from "./components";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -81,8 +81,8 @@ export function registerSmbCommand(): () => void {
         {
           name: "action",
           displayName: "action",
-          description: "connect / url / status / scan / shape / reset",
-          displayDescription: "connect / url / status / scan / shape / reset",
+          description: "connect / url / status / scan / shape / keys / reset",
+          displayDescription: "connect / url / status / scan / shape / keys / reset",
           type: 3,
           required: false,
         },
@@ -130,6 +130,11 @@ export function registerSmbCommand(): () => void {
             if (!lines.length) lines.push("Scan returned no results");
             return { content: lines.join("\n") };
           }
+          if (action === "keys") {
+            const lines: string[] = ["**openLazy keys seen**", ""];
+            try { if (getSeenLazyKeys) lines.push(...getSeenLazyKeys()); } catch {}
+            return { content: lines.join("\n") };
+          }
           if (action === "reset") {
             try { if (resetTrackedCtx) resetTrackedCtx(); } catch {}
             return { content: "Tracked context reset" };
@@ -149,6 +154,7 @@ export function registerSmbCommand(): () => void {
             "`/smb scan` \u2014 Scan context-menu modules",
             "`/smb reset` \u2014 Reset tracked message context",
             "`/smb shape` \u2014 Dump last native menu row prop shape",
+            "`/smb keys` \u2014 List ActionSheet openLazy keys seen",
             "",
             "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];

@@ -1,4 +1,5 @@
-import { React, ReactNative, FluxDispatcher } from "@vendetta/metro/common";
+import { React, ReactNative, FluxDispatcher, url } from "@vendetta/metro/common";
+import { findInReactTree } from "@vendetta/utils";
 import {
   find,
   findByName,
@@ -848,238 +849,169 @@ function tryInject(items: any[], ctx: any): boolean {
   } catch (e) { log("tryInject FAIL", e); return false; }
 }
 
+function iconForLabel(id: string, label: string): number | undefined {
+  try {
+    const map: Record<string, string[]> = {
+      "smb-copy-id": ["ic_copy_id", "CopyIcon", "ic_message_copy"],
+      "smb-copy-link": ["ic_copy_message_link", "LinkIcon", "ic_link_24px"],
+      "smb-copy-raw": ["ic_message_copy", "ic_chat_bubble_16px", "CopyIcon"],
+      "smb-copy-user-id": ["ic_members", "ic_copy_id", "CopyIcon"],
+      "smb-copy-username": ["ic_members", "ic_copy_id", "CopyIcon"],
+      "smb-copy-avatar": ["ic_link_24px", "LinkIcon", "ic_image"],
+      "smb-copy-created": ["ic_chat_bubble_16px", "ic_calendar", "ic_copy_id"],
+      "smb-copy-json": ["ic_message_copy", "ic_copy_id", "CopyIcon"],
+      "smb-copy-channel-id": ["ic_members", "ic_copy_id", "CopyIcon"],
+      "smb-copy-guild-id": ["ic_members", "ic_copy_id", "CopyIcon"],
+      "smb-jump": ["ic_link_24px", "ic_copy_message_link", "LinkIcon"],
+      "smb-header": ["ic_copy_id", "CopyIcon"],
+    };
+    const names = map[id] || ["ic_copy_id", "CopyIcon"];
+    for (const n of names) {
+      try {
+        const asset = getAssetIDByName(n);
+        if (typeof asset === "number" && asset > 0) return asset;
+      } catch {}
+    }
+  } catch {}
+  return undefined;
+}
+
+// Resolve the ActionSheet lazy-open module + ActionSheetRow component.
+const ActionSheetModule = safeFind("openLazy", () => findByProps("openLazy", "hideActionSheet"));
+const ActionSheetRowMod = safeFind("ActionSheetRow", () => findByProps("ActionSheetRow"));
+const ActionSheetRow: any = ActionSheetRowMod?.ActionSheetRow;
+
+// Record openLazy keys observed on-device so `/smb keys` can report them.
+const seenLazyKeys = new Set<string>();
+export function getSeenLazyKeys(): string[] {
+  return seenLazyKeys.size ? Array.from(seenLazyKeys) : ["(no ActionSheet opened yet - long-press a message or open a profile)"];
+}
+
+// Build our ActionSheetRow elements from the additions list.
+function buildSmbRows(additions: any[]): any[] {
+  const rows: any[] = [];
+  for (const add of additions) {
+    if (!add?.label) continue;
+    const iconAsset = iconForLabel(add.id, add.label);
+    const rowProps: any = {
+      key: add.id,
+      label: add.label,
+      onPress: () => {
+        try { add.action(); } catch (e) { log("smb row action FAIL", e); }
+        try { ActionSheetModule?.hideActionSheet?.(); } catch {}
+      },
+    };
+    if (iconAsset != null && ActionSheetRow?.Icon) {
+      rowProps.icon = React.createElement(ActionSheetRow.Icon, { source: iconAsset });
+    }
+    rows.push(React.createElement(ActionSheetRow, rowProps));
+  }
+  return rows;
+}
+
+// Inject SMB rows into a rendered ActionSheet's row array (found via findInReactTree).
+function injectRowsInto(res: any, ctx: any): boolean {
+  if (!ActionSheetRow) { log("ActionSheetRow missing"); return false; }
+  const additions = buildContextMenuAdditions(ctx);
+  if (!additions.length) return false;
+
+  // Try to locate the array of native rows using both known filters.
+  let rows = findInReactTree(res, (r: any) =>
+    Array.isArray(r) && r[0]?.type?.name === "ActionSheetRowGroup");
+  if (!rows) {
+    rows = findInReactTree(res, (r: any) =>
+      Array.isArray(r) && r[0]?.type?.name === "ButtonRow");
+  }
+  if (!rows || !Array.isArray(rows)) { log("ctx rows array not found"); return false; }
+
+  // Guard against duplicate injection on re-renders.
+  const already = rows.some((r: any) => {
+    const k = r?.key;
+    return typeof k === "string" && (k === "smb-group" || k.indexOf("smb-") === 0);
+  });
+  if (already) return false;
+
+  const smbRows = buildSmbRows(additions);
+  if (!smbRows.length) return false;
+
+  // Wrap our rows in an ActionSheetRow.Group so they render as a native section.
+  if (ActionSheetRow.Group) {
+    rows.unshift(React.createElement(ActionSheetRow.Group, { key: "smb-group" }, ...smbRows));
+  } else {
+    rows.unshift(...smbRows);
+  }
+  captureItemShape(rows[0]);
+  return true;
+}
+
 function patchContextMenuItems(): Unpatch | void {
   const unpatches: (() => void)[] = [];
 
-  // --- Strategy 1: ContextMenuContainer component render ---  
-  const ctxContainerMod = safeFind("ContextMenuContainer", () => findByProps("ContextMenuContainer"));
-  if (ctxContainerMod?.ContextMenuContainer) {
-    log("ContextMenu: ContextMenuContainer");
-    const un = patchComponentRender(ctxContainerMod.ContextMenuContainer, "ctxContainer", (_args: any[], ret: any) => {
-      try {
-        const props = _args?.[0] ?? {};
-        // Items might be in props directly or in the data prop
-        for (const key of ["items", "menuItems", "children", "data"]) {
-          if (Array.isArray(props[key])) {
-            tryInject(props[key], props); break;
-          }
-        }
-      } catch {}
-      return ret;
-    });
-    if (typeof un === "function") unpatches.push(un);
+  if (!ActionSheetModule || typeof ActionSheetModule.openLazy !== "function") {
+    log("ContextMenu: openLazy module not found");
+    return;
+  }
+  if (!ActionSheetRow) {
+    log("ContextMenu: ActionSheetRow component not found");
   }
 
-  // --- Strategy 2: Patch showContextMenu ---
-  const showCtxMod = safeFind("showContextMenu", () => findByProps("showContextMenu"));
-  if (showCtxMod && typeof showCtxMod.showContextMenu === "function") {
-    log("ContextMenu: showContextMenu (after)");
-    unpatches.push(
-      (after as any)("showContextMenu", showCtxMod, (args: any[], ret: any) => {
+  // Keys whose ActionSheet we augment (messages + user/member profiles).
+  const MESSAGE_KEYS = ["MessageLongPressActionSheet"];
+  const isUserKey = (key: string) => /UserProfile|UserActionSheet|User/i.test(key);
+
+  const un = (before as any)("openLazy", ActionSheetModule, (args: any[]) => {
+    try {
+      const [component, key, props] = args;
+      if (typeof key === "string") seenLazyKeys.add(key);
+      if (!component || typeof component.then !== "function") return;
+
+      const isMessage = MESSAGE_KEYS.includes(key) && props?.message;
+      const isUser = isUserKey(key);
+      if (!isMessage && !isUser) return;
+
+      // Merge props into tracked context so buildContextMenuAdditions can resolve ids.
+      const ctx: any = { ...props };
+      if (props?.message) { ctx.message = props.message; ctx.user = props.message.author; }
+      if (props?.user) ctx.user = props.user;
+      if (props?.userId) ctx.userId = props.userId;
+      if (props?.channelId) ctx.channelId = props.channelId;
+      if (props?.channel) ctx.channel = props.channel;
+      if (props?.guildId) ctx.guildId = props.guildId;
+
+      component.then((instance: any) => {
         try {
-          // Try all args that look like config
-          for (const arg of args) {
-            if (arg && typeof arg === "object") {
-              ctxDebugDump(arg, "showContextMenu");
-              // Deep scan for items arrays
-              const scan = (obj: any, depth = 0): boolean => {
-                if (!obj || depth > 3) return false;
-                for (const key of ["items", "menuItems", "rows", "options", "actions", "children", "sections"]) {
-                  if (Array.isArray(obj[key])) {
-                    if (tryInject(obj[key], obj)) return true;
-                  }
-                }
-                if (obj.data) {
-                  for (const key of ["items", "menuItems", "children"]) {
-                    if (Array.isArray(obj.data[key])) {
-                      if (tryInject(obj.data[key], obj.data)) return true;
-                    }
-                  }
-                }
-                for (const k of Object.keys(obj)) {
-                  if (typeof obj[k] === "object" && obj[k] !== null && !Array.isArray(obj[k])) {
-                    if (scan(obj[k], depth + 1)) return true;
-                  }
-                }
-                return false;
-              };
-              scan(arg);
-            }
-          }
-        } catch (e) { log("ctx showContextMenu FAIL", e); }
-        return ret;
-      })
-    );
-  }
+          const unpatchInner = (after as any)("default", instance, (_a: any[], res: any) => {
+            try {
+              React.useEffect(() => () => { try { unpatchInner(); } catch {} }, []);
+              injectRowsInto(res, ctx);
+            } catch (e) { log("ctx inner after FAIL", e); }
+            return res;
+          });
+        } catch (e) { log("ctx component.then FAIL", e); }
+      }).catch(() => {});
+    } catch (e) { log("ctx openLazy FAIL", e); }
+  });
+  if (typeof un === "function") unpatches.push(un);
 
-  // --- Strategy 3: Patch updateContextMenuState (context/reducer pattern) ---
-  const updMod = showCtxMod || safeFind("updateContextMenuState", () => findByProps("updateContextMenuState"));
-  if (updMod && typeof updMod.updateContextMenuState === "function") {
-    log("ContextMenu: updateContextMenuState");
-    unpatches.push(
-      (before as any)("updateContextMenuState", updMod, (args: any[]) => {
-        try {
-          const stateUpdate = args[0] ?? {};
-          ctxDebugDump(stateUpdate, "updateContextMenuState");
-          const searchAndInject = (obj: any, depth = 0): boolean => {
-            if (!obj || depth > 3) return false;
-            for (const key of ["items", "menuItems", "rows"]) {
-              if (Array.isArray(obj[key])) {
-                if (tryInject(obj[key], obj)) return true;
-              }
-            }
-            for (const k of Object.keys(obj)) {
-              if (typeof obj[k] === "object" && obj[k] !== null && !Array.isArray(obj[k])) {
-                if (searchAndInject(obj[k], depth + 1)) return true;
-              }
-            }
-            return false;
-          };
-          searchAndInject(stateUpdate);
-        } catch (e) { log("ctx updateContextMenuState FAIL", e); }
-      })
-    );
-  }
-
-  // --- Strategy 4: Patch openContextMenu ---
-  const openCtx = safeFind("openContextMenu", () => findByProps("openContextMenu"));
-  if (openCtx && typeof openCtx.openContextMenu === "function") {
-    log("ContextMenu: openContextMenu");
-    unpatches.push(
-      (instead as any)("openContextMenu", openCtx, (args: any[], orig: Function) => {
-        try {
-          for (const arg of args) {
-            if (arg && typeof arg === "object") {
-              ctxDebugDump(arg, "openContextMenu");
-              for (const key of ["items", "menuItems", "rows", "options", "actions"]) {
-                if (Array.isArray(arg[key])) {
-                  tryInject(arg[key], arg);
-                }
-              }
-              if (arg.data) {
-                for (const key of ["items", "menuItems"]) {
-                  if (Array.isArray(arg.data[key])) {
-                    tryInject(arg.data[key], arg.data);
-                  }
-                }
-              }
-            }
-          }
-        } catch (e) { log("ctx openContextMenu FAIL", e); }
-        return orig(...args);
-      })
-    );
-  }
-
-  // --- Strategy 5: BottomSheet component ---
-  const bsMod = safeFind("BottomSheet", () => findByProps("BottomSheet"));
-  if (bsMod?.BottomSheet) {
-    log("ContextMenu: BottomSheet");
-    const un = patchComponentRender(bsMod.BottomSheet, "bottomSheet", (a: any[], r: any) => {
-      try {
-        const p = a?.[0] ?? {};
-        for (const k of ["items", "children", "rows"]) {
-          if (Array.isArray(p[k])) { tryInject(p[k], p); break; }
-        }
-      } catch {}
-      return r;
-    });
-    if (typeof un === "function") unpatches.push(un);
-  }
-
-  // --- Strategy 6: showActionSheet ---
-  const actionMod = safeFind("showActionSheet", () => findByProps("showActionSheet"));
-  if (actionMod) {
-    if (typeof actionMod.showActionSheet === "function") {
-      log("ContextMenu: showActionSheet");
-      unpatches.push(
-        (before as any)("showActionSheet", actionMod, (args: any[]) => {
-          try {
-            const config = args[0] ?? {};
-            ctxDebugDump(config, "showActionSheet");
-            for (const key of ["items", "options", "menuItems"]) {
-              if (Array.isArray(config[key])) {
-                tryInject(config[key], config); break;
-              }
-            }
-          } catch (e) { log("ctx showActionSheet FAIL", e); }
-        })
-      );
-    }
-    // Also try patching the default export
-    if (typeof actionMod.default === "function") {
-      log("ContextMenu: ActionSheet(default)");
-      const orig = actionMod.default;
-      actionMod.default = function (...a: any[]) {
-        try {
-          const config = a[0] ?? {};
-          for (const key of ["items", "options", "menuItems"]) {
-            if (Array.isArray(config[key])) {
-              tryInject(config[key], config); break;
-            }
-          }
-        } catch {}
-        return orig.apply(this, a);
-      };
-      unpatches.push(() => { actionMod.default = orig; });
-    }
-  }
-
-  // --- Strategy 7: Flux dispatch intercept ---
+  // Also patch showUserProfileActionSheet directly (some builds bypass openLazy key match).
   try {
-    if (FluxDispatcher && typeof FluxDispatcher.dispatch === "function") {
-      unpatches.push(
-        (before as any)("dispatch", FluxDispatcher, (args: any[]) => {
-          try {
-            const action = args?.[0];
-            if (!action?.type) return;
-            if (/CONTEXT_MENU|LONG_PRESS/i.test(action.type)) {
-              for (const key of ["items", "menuItems", "options"]) {
-                if (Array.isArray(action[key])) {
-                  tryInject(action[key], action); break;
-                }
-              }
-            }
-          } catch {}
-        })
-      );
+    const userSheet = safeFind("showUserProfileActionSheet", () => findByName("showUserProfileActionSheet", false));
+    if (typeof userSheet === "function") {
+      // showUserProfileActionSheet is a plain fn; it internally calls openLazy,
+      // which our before-hook above already covers. We just log availability.
+      log("ContextMenu: showUserProfileActionSheet available");
     }
   } catch {}
 
-  // --- Strategy 8: Direct ContextMenuStore patch ---
-  try {
-    // The module with showContextMenu also has ContextMenuStore
-    if (showCtxMod && showCtxMod.ContextMenuStore) {
-      log("ContextMenu: ContextMenuStore");
-      // Try to find a method that stores items
-      const store = showCtxMod.ContextMenuStore;
-      if (typeof store.getState === "function") {
-        const un = (before as any)("getState", store, () => {
-          try {
-            const state = store.getState();
-            if (state) {
-              for (const key of ["items", "menuItems", "rows"]) {
-                if (Array.isArray(state[key])) {
-                  tryInject(state[key], state);
-                }
-              }
-            }
-          } catch {}
-        });
-        if (typeof un === "function") unpatches.push(un);
-      }
-    }
-  } catch {}
-
-  // --- Summary ---
   if (!unpatches.length) {
     log("ContextMenu: no patching method found");
     return;
   }
 
-  log("ContextMenu: patched with", unpatches.length, "strategies");
+  log("ContextMenu: openLazy patch active");
   return () => unpatches.forEach((u) => { try { u(); } catch {} });
 }
+
 
 function patchDeveloperMode(): Unpatch | void {
   try {
@@ -1105,6 +1037,9 @@ function diagnostics(): string[] {
     ["ctxMenu.showActionSheet", () => findByProps("showActionSheet")],
     ["ctxMenu.updCtxState", () => findByProps("updateContextMenuState")],
     ["ctxMenu.bottomSheet", () => findByProps("BottomSheet")],
+    ["ctxMenu.openLazy", () => findByProps("openLazy", "hideActionSheet")],
+    ["ctxMenu.actionSheetRow", () => findByProps("ActionSheetRow")],
+    ["ctxMenu.userProfileSheet", () => findByName("showUserProfileActionSheet", false)],
     ["nameplate", () => findByName("Nameplate", false)],
     ["nameplateInner", () => findByName("NameplateInner", false)],
     ["username", () => findByName("Username", false)],
