@@ -9,6 +9,7 @@ import {
   findByStoreName,
 } from "@vendetta/metro";
 import { before, after, instead } from "@vendetta/patcher";
+import { getAssetIDByName } from "@vendetta/ui/assets";
 import { copyText } from "./clipboard";
 import { toast } from "./toast";
 
@@ -183,6 +184,30 @@ function findSeparatorItem(items: any[]): any {
       return item;
     }
   }
+  return null;
+}
+
+// Resolve a native Discord asset ID for a menu row icon by label. Native
+// menu rows accept an asset id (number) via iconSource; using Discord's own
+// asset names keeps the icon visually identical to built-in rows.
+function resolveMenuIconAsset(label: string): number | null {
+  try {
+    if (!getAssetIDByName) return null;
+    const lower = (label || "").toLowerCase();
+    let names: string[] = [];
+    if (lower.includes("link")) names = ["LinkIcon", "ic_link", "CopyLinkIcon"];
+    else if (lower.includes("raw") || lower.includes("message")) names = ["ChatIcon", "ic_message", "MessagesIcon", "TextIcon"];
+    else if (lower.includes("user") || lower.includes("username")) names = ["PersonIcon", "ic_members", "FriendsIcon", "ProfileIcon"];
+    else if (lower.includes("channel")) names = ["ChannelListIcon", "TextChannelIcon", "ic_channel", "HashtagIcon"];
+    else if (lower.includes("guild") || lower.includes("server")) names = ["ServerIcon", "GuildIcon", "ic_server", "ShieldIcon"];
+    else names = ["CopyIcon", "ic_copy_id", "ClipboardIcon", "IdIcon"];
+    for (const n of names) {
+      try {
+        const id = getAssetIDByName(n);
+        if (typeof id === "number" && id > 0) return id;
+      } catch {}
+    }
+  } catch {}
   return null;
 }
 
@@ -480,6 +505,132 @@ function ctxDebugDump(ctx: any, label: string) {
   } catch (e) { log("ctxDebugDump FAIL", e); }
 }
 
+// Stores the prop shape of the last real native menu row we saw, so the user
+// can inspect it via `/smb shape` even without DevTools.
+let lastItemShape: string[] = [];
+export function getItemShape(): string[] {
+  return lastItemShape.length ? lastItemShape : ["(no native menu row captured yet — open a message context menu first)"];
+}
+
+function describeValue(v: any): string {
+  if (v === null) return "null";
+  if (v === undefined) return "undefined";
+  const t = typeof v;
+  if (t === "string") return "string(" + (v.length > 16 ? v.slice(0, 16) + "\u2026" : v) + ")";
+  if (t === "number" || t === "boolean") return t + "(" + String(v) + ")";
+  if (t === "function") return "fn";
+  if (React.isValidElement(v)) return "element";
+  if (Array.isArray(v)) return "array(" + v.length + ")";
+  return "object";
+}
+
+// Record a native menu row's type name + prop keys for later inspection.
+function captureItemShape(el: any) {
+  try {
+    if (!React.isValidElement(el)) return;
+    const type: any = el.type;
+    const name = type?.displayName || type?.name || (typeof type === "string" ? type : "anon");
+    const props = (el as any).props || {};
+    const lines: string[] = [];
+    lines.push("type=" + name);
+    for (const k of Object.keys(props)) {
+      lines.push("  " + k + ": " + describeValue(props[k]));
+    }
+    lastItemShape = lines;
+    log("nativeItemShape", name, "keys=", Object.keys(props).join(","));
+  } catch (e) { log("captureItemShape FAIL", e); }
+}
+
+// Pick the best template row: a real menu item (not a separator/header/View).
+function pickNativeTemplate(items: any[]): any {
+  let fallback: any = null;
+  for (const item of items) {
+    if (!React.isValidElement(item)) continue;
+    const props: any = (item as any).props || {};
+    // Skip separators (thin views).
+    if (props.style?.height === 1 || props.style?.marginVertical === 1 || props.style?.marginVertical === 2) continue;
+    // Prefer rows that expose an onPress handler and a label/children.
+    if (typeof props.onPress === "function" || typeof props.onSelect === "function") return item;
+    if (props.label != null || props.title != null) { if (!fallback) fallback = item; }
+    if (!fallback) fallback = item;
+  }
+  return fallback;
+}
+
+// Clone a native menu row, overriding only its label text, press handler and
+// icon so it inherits the exact native Discord styling.
+function cloneNativeItem(template: any, add: any): any {
+  try {
+    if (!React.isValidElement(template)) return null;
+    const src: any = (template as any).props || {};
+    const next: any = { key: add.id };
+    const press = () => { try { add.action(); } catch (e) { log("ctx action FAIL", e); } };
+
+    // Wire the press handler onto whichever prop the native row uses.
+    if ("onPress" in src) next.onPress = press;
+    else if ("onSelect" in src) next.onSelect = press;
+    else if ("onClick" in src) next.onClick = press;
+    else next.onPress = press;
+
+    // Override the visible text via whichever text prop exists.
+    if ("label" in src) next.label = add.label;
+    else if ("title" in src) next.title = add.label;
+    else if ("text" in src) next.text = add.label;
+    else if ("name" in src) next.name = add.label;
+
+    // Override the icon via whichever icon prop exists, using a native asset id.
+    const iconAsset = resolveMenuIconAsset(add.label);
+    if (iconAsset != null) {
+      if ("iconSource" in src) next.iconSource = iconAsset;
+      else if ("icon" in src) next.icon = iconAsset;
+      else if ("leftIcon" in src) next.leftIcon = iconAsset;
+      else if ("source" in src) next.source = iconAsset;
+    }
+
+    // If the row renders text purely via children (no label prop), replace it.
+    const hasTextProp = ("label" in src) || ("title" in src) || ("text" in src) || ("name" in src);
+    if (!hasTextProp) {
+      next.children = renderRowChildren(template, add.label);
+    }
+
+    return React.cloneElement(template, next);
+  } catch (e) {
+    log("cloneNativeItem FAIL", e);
+    return null;
+  }
+}
+
+// Build children matching the template's inner structure: try to reuse the
+// template's existing text element and just swap its string content.
+function renderRowChildren(template: any, label: string): any {
+  try {
+    const children = (template as any).props?.children;
+    const replaceText = (node: any): any => {
+      if (typeof node === "string") return label;
+      if (Array.isArray(node)) {
+        let replaced = false;
+        const out = node.map((n) => {
+          if (!replaced && (typeof n === "string" || (React.isValidElement(n) && (n.type === Text || (n as any).type?.displayName === "Text")))) {
+            replaced = true;
+            if (typeof n === "string") return label;
+            return React.cloneElement(n as any, {}, label);
+          }
+          return n;
+        });
+        if (replaced) return out;
+        return out;
+      }
+      if (React.isValidElement(node)) {
+        return React.cloneElement(node as any, {}, label);
+      }
+      return label;
+    };
+    const result = replaceText(children);
+    if (result != null) return result;
+  } catch (e) { log("renderRowChildren FAIL", e); }
+  return React.createElement(Text, { style: { color: "#dbdee1", fontSize: 16 } }, label);
+}
+
 // Try to inject additions into an items array. Handles both object items and string items.
 function tryInject(items: any[], ctx: any): boolean {
   if (!Array.isArray(items) || !items.length) return false;
@@ -510,82 +661,53 @@ function tryInject(items: any[], ctx: any): boolean {
 
     // Check if existing items are React elements (rendered directly as children)
     const hasReactElements = items.some((i: any) => React.isValidElement(i));
-    
+
     if (hasReactElements) {
-      // Prefer Discord-native menu item construction when possible.
-      // Many mobile context menus here render React elements directly, so
-      // cloning arbitrary elements often loses the original button styling.
-      const ctxMod = safeFind("ctxMenu.container", () => findByProps("ContextMenuContainer"));
-      const NativeButton = ctxMod?.Button || null;
-      const iconMod = safeFind("ctxMenu.image", () => findByProps("Image"));
-      const NativeImage = iconMod?.Image || null;
-      const separatorStyle = { height: 1, backgroundColor: "#3f4147", marginVertical: 4 };
-      
-      // Try to reuse an existing separator element style when available
+      // Capture the shape of a real native menu row so we can diagnose it
+      // (no DevTools available on device) and clone it faithfully.
+      const template = pickNativeTemplate(items);
+      if (template) captureItemShape(template);
+
+      // Build a Discord-native separator by cloning an existing one if possible.
       const existingSep = findSeparatorItem(items);
       if (existingSep) {
         items.push(React.cloneElement(existingSep, { key: "smb-sep" }));
       } else {
-        items.push(React.createElement(View, { key: "smb-sep", style: separatorStyle }));
+        items.push(
+          React.createElement(View, {
+            key: "smb-sep",
+            style: { height: 1, backgroundColor: "#3f4147", marginVertical: 4 },
+          }),
+        );
       }
-      
+
       for (const add of additions) {
-        const iconComp = resolveMenuIcon(add.label);
-        if (NativeButton) {
-          // Use the native context menu button so styling stays identical
-          try {
-            const icon = iconComp ? React.createElement(iconComp, { key: "icon", size: 16, color: "#dcddde" }) : null;
-            items.push(
-              React.createElement(NativeButton, {
-                key: add.id,
-                label: add.label,
-                leftAccessory: icon,
-                onPress: () => add.action(),
-              })
-            );
-            continue;
-          } catch {}
-          try {
-            const icon = iconComp ? React.createElement(iconComp, { key: "icon", size: 16, color: "#dcddde" }) : null;
-            items.push(
-              React.createElement(NativeButton, {
-                key: add.id,
-                children: add.label,
-                leftAccessory: icon,
-                onPress: () => add.action(),
-              })
-            );
-            continue;
-          } catch {}
-        }
-        
-        // Fallback: clone an existing item, but preserve label/onPress cleanly
-        const template = items.find((i: any) => React.isValidElement(i)) || null;
-        const fallbackIcon = resolveMenuIcon(add.label) || null;
+        // Preferred path: clone a genuine native row so it inherits the exact
+        // Discord styling (row height, padding, ripple, text style).
         if (template) {
-          items.push(
-            React.cloneElement(template, {
-              key: add.id,
-              children: add.label,
-              onPress: () => add.action(),
-            })
-          );
-        } else {
-          const children = fallbackIcon
-            ? [React.createElement(fallbackIcon, { key: "icon", size: 16, color: "#dcddde" }), React.createElement(Text, { key: "label", style: { color: "#dcddde", fontSize: 14, marginLeft: 6 } }, add.label)]
-            : React.createElement(Text, { style: { color: "#dcddde", fontSize: 14 } }, add.label);
-          items.push(
-            React.createElement(
-              TouchableOpacity,
-              {
-                key: add.id,
-                onPress: () => add.action(),
-                style: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
-              },
-              children
-            )
-          );
+          const cloned = cloneNativeItem(template, add);
+          if (cloned) { items.push(cloned); continue; }
         }
+
+        // Last-resort custom row (only used if no template exists at all).
+        const iconComp = resolveMenuIcon(add.label);
+        const children = iconComp
+          ? [
+              React.createElement(iconComp, { key: "icon", size: 18, color: "#dbdee1" }),
+              React.createElement(Text, { key: "label", style: { color: "#dbdee1", fontSize: 16, marginLeft: 12 } }, add.label),
+            ]
+          : React.createElement(Text, { style: { color: "#dbdee1", fontSize: 16 } }, add.label);
+        items.push(
+          React.createElement(
+            TouchableOpacity,
+            {
+              key: add.id,
+              onPress: () => add.action(),
+              style: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
+            },
+            children,
+          ),
+        );
       }
       return true;
     }
