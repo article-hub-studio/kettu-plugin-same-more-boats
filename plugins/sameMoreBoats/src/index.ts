@@ -1,7 +1,9 @@
 import { initStorage, settings, registerSmbCommand } from "./modules/settings";
 import { toast } from "./modules/toast";
 import { patchFeatureGates } from "./modules/featureGates";
-import { patchComponents } from "./modules/components";
+import { patchMessageAuthor } from "./modules/authorTags";
+import { patchContextMenuItems } from "./modules/actionSheet";
+import { patchDeveloperMode } from "./modules/developerMode";
 import { enableTags } from "./modules/tags";
 import { enableForums } from "./modules/forums";
 import { enableServerSettings } from "./modules/serverSettings";
@@ -42,7 +44,9 @@ export default {
         };
 
         safe("featureGates", () => patchFeatureGates(cfg));
-        safe("components", () => patchComponents());
+        if (cfg.tags) safe("authorTags", () => patchMessageAuthor());
+        if (cfg.contextMenu) safe("actionSheet", () => patchContextMenuItems());
+        if (cfg.devTools) safe("developerMode", () => patchDeveloperMode());
         if (cfg.tags) safe("tags", () => enableTags());
         if (cfg.forums) safe("forums", () => enableForums());
         if (cfg.serverSettings) safe("serverSettings", () => enableServerSettings());

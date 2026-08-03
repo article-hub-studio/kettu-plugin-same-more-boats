@@ -1,8 +1,8 @@
 {
   "name": "Same More Boats",
-  "description": "Brings PC-only Discord features to mobile: tags, forum channels, advanced server settings, grouped member list, expanded context menus, developer tools and more. Mobile-first parity with desktop.",
+  "description": "Brings PC-only Discord UI to mobile: author/role tags, expanded context menus (Copy ID, Message Link, Avatar URL, JSON...), forced Developer Mode plus Flux/DevTools inspection. Some listed items are UI-only and still gated by the server.",
   "authors": [
-    { "name": "you", "id": "0" }
+    { "name": "Gaya" }
   ],
   "main": "src/index.ts",
   "vendetta": { "icon": "ic_desktop_24px" }

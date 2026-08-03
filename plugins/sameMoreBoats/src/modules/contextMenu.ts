@@ -1,27 +1,11 @@
-// Context menu expansion is handled in components.ts (real React patching of
-// the menu builder). This module is kept for the feature toggle / Flux
-// harvesting of guild+message ids that the menu may need.
+// Context menu row injection is handled in actionSheet.ts (patching
+// ActionSheet.openLazy). This module is a thin no-op kept so the feature
+// toggle in settings has something to point at while remaining cheap: when
+// enabled it does nothing at runtime beyond confirming the toggle is on.
 
-import { before } from "@vendetta/patcher";
-import { FluxDispatcher } from "@vendetta/metro/common";
-
-const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
+import { log } from "./utils";
 
 export function expandContextMenu(): () => void {
-  const un: (() => void)[] = [];
-  // Observe any action carrying message/channel context so the menu patch
-  // can resolve ids when triggered.
-  un.push(
-    before("dispatch", FluxDispatcher, (args: any[]) => {
-      try {
-        const a = args?.[0];
-        if (!a?.type) return;
-        if (/MESSAGE|CHANNEL|CONTEXT/i.test(a.type)) {
-          log("ctx observe:", a.type);
-        }
-      } catch {}
-    })
-  );
-  log("contextMenu: observer active (render in components.ts)");
-  return () => un.forEach((u) => { try { u(); } catch {} });
+  log("contextMenu toggle: enabled (row injection lives in actionSheet.ts)");
+  return () => {};
 }

@@ -1,11 +1,10 @@
-// Tags: feed role data into the components.ts role cache so the message-author
-// patch can render bot/role tags next to usernames (like desktop).
-// Previous approach stamped __smbTags on author objects — no component read it.
-// Now components.ts owns rendering; this module just keeps the role cache fed.
+// Tags: feed role data into the shared role cache (context.ts) so the
+// message-author patch (authorTags.ts) can render bot/role tags next to
+// usernames (like desktop). This module just keeps the role cache fed.
 
 import { before } from "@vendetta/patcher";
 import { FluxDispatcher } from "@vendetta/metro/common";
-import { refreshRoleCache } from "./components";
+import { refreshRoleCache } from "./context";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 

@@ -1,9 +1,10 @@
-import { React, ReactNative } from "@vendetta/metro/common";
 import { createMMKVBackend, createStorage, wrapSync } from "@vendetta/storage";
 import { registerCommand } from "@vendetta/commands";
 import { ApplicationCommandInputType, ApplicationCommandType } from "@vendetta/constants";
 import { connectToDebugger } from "@vendetta/debug";
-import { getDiagnostics, getCtxModuleScan, resetTrackedCtx, getTrackedCtx, getItemShape, getSeenLazyKeys } from "./components";
+import { getDiagnostics, getCtxModuleScan } from "./diagnostics";
+import { resetTrackedCtx } from "./context";
+import { getItemShape, getSeenLazyKeys } from "./injectors";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
