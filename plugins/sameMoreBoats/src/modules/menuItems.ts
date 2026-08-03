@@ -1,5 +1,10 @@
 // Builds the PC-style additions for message/user context menus: copy IDs,
 // message link, raw content, avatar URL, account creation date, message JSON.
+//
+// Key correctness rule: an entry is only shown when the matching data is
+// actually present AND of the expected kind. Previously everything fell back to
+// `?? mergedCtx`, so `userId`/`messageId` resolved to whatever id was lying
+// around and every row appeared in every menu.
 
 import { log } from "./utils";
 import { getTrackedCtx } from "./context";
@@ -20,34 +25,73 @@ export function snowflakeToDate(id: string): Date | null {
   } catch { return null; }
 }
 
+// True for plausible Discord snowflakes.
+function isSnowflake(v: any): v is string {
+  return typeof v === "string" && /^\d{15,25}$/.test(v);
+}
+
+// Find the first key holding a snowflake id on the object (exact-name match
+// only, so we don't accidentally pick a role id as a message id).
+function findIdField(obj: any): string | undefined {
+  if (!obj || typeof obj !== "object") return undefined;
+  for (const k of ["id", "messageId", "message_id", "userId", "user_id", "channelId", "channel_id", "guildId", "guild_id"]) {
+    if (isSnowflake((obj as any)[k])) return (obj as any)[k];
+  }
+  return undefined;
+}
+
+// Try to recognise a message-shaped object (has an author and either content
+// or a channel_id — enough to distinguish from a user/channel payload).
+function asMessage(v: any): any | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const hasAuthor = v.author && typeof v.author === "object";
+  const hasContent = typeof v.content === "string";
+  const hasChannel = isSnowflake(v.channel_id) || isSnowflake(v.channelId);
+  if (hasAuthor || (hasContent && hasChannel)) return v;
+  return undefined;
+}
+
+// Try to recognise a user-shaped object (pomelo username, no message fields).
+function asUser(v: any): any | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  if (typeof v.username === "string" && isSnowflake(v.id)) return v;
+  return undefined;
+}
+
 export function buildMenuAdditions(ctx: any): MenuAddition[] {
   const additions: MenuAddition[] = [];
   try {
-    // Merge with tracked context if available
-    const mergedCtx = { ...getTrackedCtx(), ...ctx };
+    // Merge with tracked context if available. trackedCtx only ever receives
+    // validated fields, so it never contributes a spurious fallback object.
+    const mergedCtx = { ...getTrackedCtx(), ...(ctx || {}) };
 
-    // Try every possible path to extract context data
-    const message = mergedCtx.message ?? mergedCtx.msg ?? mergedCtx.data?.message ?? mergedCtx;
-    const user = mergedCtx.user ?? mergedCtx.author ?? mergedCtx.creator ?? message?.author ?? message?.user ?? mergedCtx;
-    const channel = mergedCtx.channel ?? mergedCtx.chan ?? message?.channel ?? mergedCtx;
+    // Resolve each entity strictly — no self-fallbacks (`?? mergedCtx`).
+    const rawMessage = mergedCtx.message ?? mergedCtx.msg ?? mergedCtx.data?.message;
+    const message = asMessage(rawMessage);
 
-    // Extract IDs from anywhere in the context
-    const id = mergedCtx.id ?? message?.id ?? user?.id ?? channel?.id ?? mergedCtx.guildId ?? mergedCtx.channelId ?? mergedCtx.messageId ?? mergedCtx.userId;
-    const messageId = message?.id ?? mergedCtx.messageId ?? mergedCtx.id;
-    const userId = user?.id ?? mergedCtx.userId ?? mergedCtx.authorId;
-    const channelId = channel?.id ?? mergedCtx.channelId ?? mergedCtx.channel_id;
-    const guildId = mergedCtx.guildId ?? mergedCtx.guild_id ?? mergedCtx.guild;
+    const rawUser = mergedCtx.user ?? mergedCtx.author ?? mergedCtx.creator
+      ?? (message ? message.author ?? message.user : undefined)
+      ?? (mergedCtx.member?.user);
+    const user = asUser(rawUser);
 
-    // Always try to add "Copy ID" if we found ANY id
-    if (id) {
-      additions.push({
-        label: "Copy ID" + (String(id).length > 18 ? " (" + String(id).slice(0, 8) + "..)" : ""),
-        id: "smb-copy-id",
-        action: () => { if (copyText(String(id))) toast("Copied ID"); },
-      });
-    }
+    const rawChannel = mergedCtx.channel ?? mergedCtx.chan;
+    const channel = rawChannel && typeof rawChannel === "object" ? rawChannel : undefined;
 
-    // Copy Message Link
+    const messageId = (message && (findIdField(message) ?? (isSnowflake(message.id) ? message.id : undefined)))
+      ?? (isSnowflake(mergedCtx.messageId) ? mergedCtx.messageId : undefined)
+      ?? (isSnowflake(mergedCtx.message_id) ? mergedCtx.message_id : undefined);
+    const userId = user ? user.id : (isSnowflake(mergedCtx.userId) ? mergedCtx.userId : (isSnowflake(mergedCtx.user_id) ? mergedCtx.user_id : undefined));
+    const channelId = (channel && isSnowflake(channel.id) ? channel.id : undefined)
+      ?? (isSnowflake(mergedCtx.channelId) ? mergedCtx.channelId : undefined)
+      ?? (isSnowflake(mergedCtx.channel_id) ? mergedCtx.channel_id : undefined)
+      ?? (message && (isSnowflake(message.channel_id) ? message.channel_id : undefined));
+    const guildId = (isSnowflake(mergedCtx.guildId) ? mergedCtx.guildId : undefined)
+      ?? (isSnowflake(mergedCtx.guild_id) ? mergedCtx.guild_id : undefined)
+      ?? (mergedCtx.guild && isSnowflake(mergedCtx.guild.id) ? mergedCtx.guild.id : undefined)
+      ?? (channel && isSnowflake(channel.guild_id) ? channel.guild_id : undefined);
+
+    // ----- Message-scoped actions -----
+
     if (messageId && channelId) {
       additions.push({
         label: "Copy Message Link",
@@ -60,8 +104,7 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       });
     }
 
-    // Copy Raw Message
-    if (message?.content) {
+    if (message && typeof message.content === "string" && message.content) {
       additions.push({
         label: "Copy Raw Message",
         id: "smb-copy-raw",
@@ -69,55 +112,15 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       });
     }
 
-    // Copy User ID + Username
-    if (userId) {
+    if (messageId) {
       additions.push({
-        label: "Copy User ID",
-        id: "smb-copy-user-id",
-        action: () => { if (copyText(String(userId))) toast("User ID copied"); },
-      });
-      if (user?.username) {
-        additions.push({
-          label: "Copy Username",
-          id: "smb-copy-username",
-          action: () => {
-            const uname = user.username + (user.discriminator && user.discriminator !== "0" ? "#" + user.discriminator : "");
-            if (copyText(uname)) toast("Username copied");
-          },
-        });
-      }
-    }
-
-    // --- PC-only features brought to mobile ---
-
-    // Copy Avatar URL (desktop right-click "Copy Image" equivalent)
-    if (userId && user?.avatar) {
-      additions.push({
-        label: "Copy Avatar URL",
-        id: "smb-copy-avatar",
-        action: () => {
-          const ext = String(user.avatar).indexOf("a_") === 0 ? "gif" : "png";
-          const url = `https://cdn.discordapp.com/avatars/${userId}/${user.avatar}.${ext}?size=1024`;
-          if (copyText(url)) toast("Avatar URL copied");
-        },
+        label: "Copy Message ID" + (String(messageId).length > 18 ? " (" + String(messageId).slice(0, 8) + "..)" : ""),
+        id: "smb-copy-id",
+        action: () => { if (copyText(String(messageId))) toast("Message ID copied"); },
       });
     }
 
-    // Copy Account Creation Date (from user snowflake)
-    if (userId) {
-      additions.push({
-        label: "Copy Account Created Date",
-        id: "smb-copy-created",
-        action: () => {
-          const d = snowflakeToDate(String(userId));
-          if (d && copyText(d.toISOString())) toast("Created: " + d.toUTCString());
-          else toast("Could not resolve creation date");
-        },
-      });
-    }
-
-    // Copy Message JSON (desktop dev feature)
-    if (message?.id) {
+    if (message) {
       additions.push({
         label: "Copy Message JSON",
         id: "smb-copy-json",
@@ -138,7 +141,55 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       });
     }
 
-    // Copy Channel ID
+    // ----- User-scoped actions -----
+
+    if (userId) {
+      additions.push({
+        label: "Copy User ID",
+        id: "smb-copy-user-id",
+        action: () => { if (copyText(String(userId))) toast("User ID copied"); },
+      });
+    }
+
+    if (user?.username) {
+      additions.push({
+        label: "Copy Username",
+        id: "smb-copy-username",
+        action: () => {
+          const uname = user.username + (user.discriminator && user.discriminator !== "0" ? "#" + user.discriminator : "");
+          if (copyText(uname)) toast("Username copied");
+        },
+      });
+    }
+
+    if (userId && user?.avatar) {
+      additions.push({
+        label: "Copy Avatar URL",
+        id: "smb-copy-avatar",
+        action: () => {
+          const ext = String(user.avatar).indexOf("a_") === 0 ? "gif" : "png";
+          const url = `https://cdn.discordapp.com/avatars/${userId}/${user.avatar}.${ext}?size=1024`;
+          if (copyText(url)) toast("Avatar URL copied");
+        },
+      });
+    }
+
+    if (userId) {
+      additions.push({
+        label: "Copy Account Created Date",
+        id: "smb-copy-created",
+        action: () => {
+          const d = snowflakeToDate(String(userId));
+          if (d && copyText(d.toISOString())) toast("Created: " + d.toUTCString());
+          else toast("Could not resolve creation date");
+        },
+      });
+    }
+
+    // ----- Channel / guild scoped actions -----
+
+    // Only show channel ID when this isn't a message menu (avoids redundancy
+    // with Copy Message Link / ID which already cover that context).
     if (channelId && !messageId) {
       additions.push({
         label: "Copy Channel ID",
@@ -147,8 +198,9 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       });
     }
 
-    // Copy Guild ID
-    if (guildId) {
+    // Only show the guild row when there's no more specific entity — otherwise
+    // every message menu ends with an unexplained "Copy Guild ID".
+    if (guildId && !messageId && !userId) {
       additions.push({
         label: "Copy Guild ID",
         id: "smb-copy-guild-id",
@@ -159,7 +211,7 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
     log("buildAdditions FAIL", e);
   }
 
-  // Always add at least one fallback item so the user can see SMB is active
+  // Fallback row so the user can see SMB is alive even on empty contexts.
   if (!additions.length) {
     additions.push({
       label: "Same More Boats ✓",
