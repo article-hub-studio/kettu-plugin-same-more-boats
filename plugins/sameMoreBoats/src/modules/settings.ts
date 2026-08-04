@@ -5,6 +5,8 @@ import { connectToDebugger } from "@vendetta/debug";
 import { getDiagnostics, getCtxModuleScan } from "./diagnostics";
 import { resetTrackedCtx } from "./context";
 import { getItemShape, getSeenLazyKeys } from "./injectors";
+import { pickRoleForIcon, openRoleIconEditor } from "./roleIcons";
+import { setRoleIcon } from "./discordApi";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -18,6 +20,7 @@ export type SMBSettings = {
   forceDesktopLayout: boolean;
   recon: boolean;
   devtoolsUrl: string;
+  roleIcons: boolean;
 };
 
 export const DEFAULTS: SMBSettings = {
@@ -30,6 +33,7 @@ export const DEFAULTS: SMBSettings = {
   forceDesktopLayout: false,
   recon: false,
   devtoolsUrl: "",
+  roleIcons: true,
 };
 
 export let settings: SMBSettings = { ...DEFAULTS };
@@ -82,8 +86,8 @@ export function registerSmbCommand(): () => void {
         {
           name: "action",
           displayName: "action",
-          description: "connect / url / status / scan / shape / keys / reset",
-          displayDescription: "connect / url / status / scan / shape / keys / reset",
+          description: "connect / url / status / scan / shape / keys / reset / roleicon",
+          displayDescription: "connect / url / status / scan / shape / keys / reset / roleicon",
           type: 3,
           required: false,
         },
@@ -95,11 +99,30 @@ export function registerSmbCommand(): () => void {
           type: 3,
           required: false,
         },
+        {
+          name: "role",
+          displayName: "role",
+          description: "Role to edit (roleicon)",
+          displayDescription: "Role to edit (roleicon)",
+          type: 8,
+          required: false,
+        },
+        {
+          name: "icon",
+          displayName: "icon",
+          description: "Emoji to set as the role icon (optional)",
+          displayDescription: "Emoji to set as the role icon (optional)",
+          type: 3,
+          required: false,
+        },
       ],
       execute: async (args: any[], _ctx: any) => {
         try {
           const action = args?.find((a) => a.name === "action")?.value;
           const url = args?.find((a) => a.name === "url")?.value;
+          const role = args?.find((a) => a.name === "role")?.value;
+          const icon = args?.find((a) => a.name === "icon")?.value;
+          const guildId = _ctx?.guild?.id;
           if (action === "connect") {
             const u = url || settings.devtoolsUrl;
             if (!u) return { content: "No URL set. Use `/smb url <ws://...>`" };
@@ -140,6 +163,30 @@ export function registerSmbCommand(): () => void {
             try { if (resetTrackedCtx) resetTrackedCtx(); } catch {}
             return { content: "Tracked context reset" };
           }
+          if (action === "roleicon") {
+            if (!settings.roleIcons) {
+              return { content: "Role icons are disabled in the Same More Boats plugin settings." };
+            }
+            if (!guildId) {
+              return { content: "Run `/smb roleicon` inside a server. Role icons need boost level 2." };
+            }
+            const roleId = role ? String(role) : null;
+            if (!roleId) {
+              try { pickRoleForIcon(guildId); } catch (e) { log("roleicon pick FAIL", e); }
+              return { content: "Opened the role picker — tap a role to choose its icon." };
+            }
+            if (icon) {
+              try {
+                const res = await setRoleIcon(guildId, roleId, String(icon));
+                return res.ok
+                  ? { content: `Role icon set on <@&${roleId}>.` }
+                  : { content: `Failed (HTTP ${res.status || "?"}${res.reason ? " · " + res.reason : ""}).` };
+              } catch (e) { log("roleicon set FAIL", e); }
+              return { content: "Failed to set the role icon." };
+            }
+            try { openRoleIconEditor(guildId, roleId); } catch (e) { log("roleicon open FAIL", e); }
+            return { content: `Opened the role icon editor for <@&${roleId}>.` };
+          }
           if (action === "shape") {
             const lines: string[] = ["**Native menu row shape**", ""];
             try { if (getItemShape) lines.push(...getItemShape()); } catch {}
@@ -156,6 +203,7 @@ export function registerSmbCommand(): () => void {
             "`/smb reset` \u2014 Reset tracked message context",
             "`/smb shape` \u2014 Dump last native menu row prop shape",
             "`/smb keys` \u2014 List ActionSheet openLazy keys seen",
+            "`/smb roleicon [role] [icon]` \u2014 Set a role icon (boost lvl 2+)",
             "",
             "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];
