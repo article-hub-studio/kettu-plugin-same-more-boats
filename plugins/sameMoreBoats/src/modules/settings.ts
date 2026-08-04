@@ -7,6 +7,7 @@ import { resetTrackedCtx } from "./context";
 import { getItemShape, getSeenLazyKeys } from "./injectors";
 import { pickRoleForIcon, openRoleIconEditor } from "./roleIcons";
 import { setRoleIcon } from "./discordApi";
+import { getRoleCaptures } from "./roleTracker";
 
 const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
 
@@ -86,8 +87,8 @@ export function registerSmbCommand(): () => void {
         {
           name: "action",
           displayName: "action",
-          description: "connect / url / status / scan / shape / keys / reset / roleicon",
-          displayDescription: "connect / url / status / scan / shape / keys / reset / roleicon",
+          description: "connect / url / status / scan / shape / keys / reset / roleicon / dump / track",
+          displayDescription: "connect / url / status / scan / shape / keys / reset / roleicon / dump / track",
           type: 3,
           required: false,
         },
@@ -163,6 +164,15 @@ export function registerSmbCommand(): () => void {
             try { if (resetTrackedCtx) resetTrackedCtx(); } catch {}
             return { content: "Tracked context reset" };
           }
+          if (action === "dump") {
+            const caps = getRoleCaptures();
+            if (!caps.length) return { content: "No role-screen captures yet. Open a role's edit screen and try again." };
+            return { content: [...caps].reverse().slice(0, 3).join("\n\n") };
+          }
+          if (action === "track") {
+            const caps = getRoleCaptures();
+            return { content: caps.length + " role captures stored. Open role settings / a role's edit screen, then run `/smb dump`." };
+          }
           if (action === "roleicon") {
             if (!settings.roleIcons) {
               return { content: "Role icons are disabled in the Same More Boats plugin settings." };
@@ -204,6 +214,8 @@ export function registerSmbCommand(): () => void {
             "`/smb shape` \u2014 Dump last native menu row prop shape",
             "`/smb keys` \u2014 List ActionSheet openLazy keys seen",
             "`/smb roleicon [role] [icon]` \u2014 Set a role icon (boost lvl 2+)",
+            "`/smb dump` \u2014 Show captured role-screen component trees",
+            "`/smb track` \u2014 Report how many role-screen captures are stored",
             "",
             "Status: " + (settings.devtoolsUrl ? "URL = " + settings.devtoolsUrl : "No DevTools URL set"),
           ];

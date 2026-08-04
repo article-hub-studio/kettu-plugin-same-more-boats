@@ -11,6 +11,7 @@ import { enableGroupedMemberList } from "./modules/memberList";
 import { expandContextMenu } from "./modules/contextMenu";
 import { enableDevTools } from "./modules/devtools";
 import { injectStyles } from "./modules/styles";
+import { enableRoleTracking } from "./modules/roleTracker";
 
 export type { SMBSettings } from "./modules/settings";
 
@@ -54,6 +55,7 @@ export default {
         if (cfg.contextMenu) safe("contextMenu", () => expandContextMenu());
         if (cfg.devTools) safe("devtools", () => enableDevTools());
         safe("styles", () => { styleEl = injectStyles(cfg); });
+        safe("roleTracker", () => enableRoleTracking());
 
         try { unregCmd = registerSmbCommand(); } catch (e) { log("cmd reg fail", e); }
 
