@@ -23,7 +23,7 @@ Brings PC-only Discord UI to mobile. Modular, with functions in `plugins/sameMor
 
 - `authorTags.ts` — renders BOT/STAFF/role pills next to message authors.
 - `actionSheet.ts` — hooks `ActionSheet.openLazy` and injects extra rows into message/user menus.
-- `menuItems.ts` — builds additions: Copy ID / Message Link / Raw / User ID / Username / Avatar URL / Account Created Date / Message JSON / Channel ID / Guild ID.
+- `menuItems.ts` — builds additions: Copy ID / Message Link / Raw / User ID / Username / Avatar URL / Account Created Date / Message JSON / Attachment URLs / Channel Link / Channel ID / Server Icon URL / Guild ID / Guild Created Date.
 - `developerMode.ts` — forces Developer Mode on (unlocks native "Copy ID" etc.).
 - `featureGates.ts` — adds desktop-style feature flags to guild payloads.
 - `devtools.ts` + `devtools WS` — Flux action logger + connect to React DevTools via `/smb connect ws://...`.

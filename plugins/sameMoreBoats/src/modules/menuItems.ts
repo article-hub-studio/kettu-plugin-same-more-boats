@@ -90,6 +90,9 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       ?? (mergedCtx.guild && isSnowflake(mergedCtx.guild.id) ? mergedCtx.guild.id : undefined)
       ?? (channel && isSnowflake(channel.guild_id) ? channel.guild_id : undefined);
 
+    // Guild-shaped object (needed for the server icon URL).
+    const guild = mergedCtx.guild && typeof mergedCtx.guild === "object" ? mergedCtx.guild : undefined;
+
     // ----- Message-scoped actions -----
 
     if (messageId && channelId) {
@@ -186,7 +189,36 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       });
     }
 
+    // ----- Attachment scoped actions -----
+
+    // Copy attachment URLs (PC shows a copyable "Open original" link; mobile
+    // doesn't, so we surface the raw CDN URLs here).
+    if (message && Array.isArray(message.attachments) && message.attachments.length) {
+      const urls = message.attachments
+        .map((a: any) => (a && typeof a.url === "string" && a.url) || (a && typeof a.proxy_url === "string" && a.proxy_url) || "")
+        .filter((u: string) => !!u);
+      if (urls.length) {
+        additions.push({
+          label: urls.length === 1 ? "Copy Attachment URL" : `Copy ${urls.length} Attachment URLs`,
+          id: "smb-copy-attachment",
+          action: () => { if (copyText(urls.join("\n"))) toast(urls.length === 1 ? "Attachment URL copied" : urls.length + " attachment URLs copied"); },
+        });
+      }
+    }
+
     // ----- Channel / guild scoped actions -----
+
+    if (channelId && !messageId) {
+      additions.push({
+        label: "Copy Channel Link",
+        id: "smb-copy-channel-link",
+        action: () => {
+          const g = guildId ? `${guildId}/` : "@me/";
+          if (copyText(`https://discord.com/channels/${g}${channelId}`))
+            toast("Channel link copied");
+        },
+      });
+    }
 
     // Only show channel ID when this isn't a message menu (avoids redundancy
     // with Copy Message Link / ID which already cover that context).
@@ -198,13 +230,36 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
       });
     }
 
-    // Only show the guild row when there's no more specific entity — otherwise
-    // every message menu ends with an unexplained "Copy Guild ID".
+    // Server icon URL — shown wherever a guild is identifiable, alongside the
+    // other guild rows.
+    if (guildId && guild?.icon) {
+      additions.push({
+        label: "Copy Server Icon URL",
+        id: "smb-copy-guild-icon",
+        action: () => {
+          const ext = String(guild.icon).indexOf("a_") === 0 ? "gif" : "png";
+          const url = `https://cdn.discordapp.com/icons/${guildId}/${guild.icon}.${ext}?size=1024`;
+          if (copyText(url)) toast("Server icon URL copied");
+        },
+      });
+    }
+
+    // Only show these guild rows when there's no more specific entity —
+    // otherwise every message menu ends with unexplained guild actions.
     if (guildId && !messageId && !userId) {
       additions.push({
         label: "Copy Guild ID",
         id: "smb-copy-guild-id",
         action: () => { if (copyText(String(guildId))) toast("Guild ID copied"); },
+      });
+      additions.push({
+        label: "Copy Guild Created Date",
+        id: "smb-copy-guild-created",
+        action: () => {
+          const d = snowflakeToDate(String(guildId));
+          if (d && copyText(d.toISOString())) toast("Guild created: " + d.toUTCString());
+          else toast("Could not resolve creation date");
+        },
       });
     }
   } catch (e) {

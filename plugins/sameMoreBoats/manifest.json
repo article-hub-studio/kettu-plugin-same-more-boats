@@ -1,6 +1,6 @@
 {
   "name": "Same More Boats",
-  "description": "Brings PC-only Discord UI to mobile: author/role tags, expanded context menus (Copy ID, Message Link, Avatar URL, JSON...), forced Developer Mode plus Flux/DevTools inspection. Some listed items are UI-only and still gated by the server.",
+  "description": "Brings PC-only Discord UI to mobile: author/role tags, expanded context menus (Copy ID, Message/Channel Link, Avatar/Server Icon URL, JSON, Attachment URLs...), forced Developer Mode plus Flux/DevTools inspection. Some listed items are UI-only and still gated by the server.",
   "authors": [
     { "name": "Gaya" }
   ],
