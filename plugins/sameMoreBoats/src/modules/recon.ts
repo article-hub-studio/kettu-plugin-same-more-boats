@@ -7,34 +7,25 @@ import {
   findByNameAll,
   findByStoreName,
 } from "@vendetta/metro";
-import { ReactNative } from "@vendetta/metro/common";
-import { showConfirmationAlert } from "@vendetta/ui/alerts";
-
-const log = (...a: any[]) => { try { console.log("[SMB]", ...a); } catch {} };
+import { log } from "./utils";
+import { toast } from "./toast";
 
 function safe<T>(fn: () => T): T | null {
   try { return fn(); } catch { return null; }
 }
 
+// Show recon results as a non-blocking Toast (truncated summary) instead of a
+// blocking Alert; the full report always goes to the console.
 function showModal(title: string, content: string) {
   try {
-    ReactNative.Alert.alert(title, content, [{ text: "OK" }], { cancelable: true });
-    return;
-  } catch {}
-  try {
-    showConfirmationAlert({
-      title,
-      content,
-      confirmText: "OK",
-      isDismissable: true,
-      onConfirm: () => {},
-      onCancel: () => {},
-    });
-    return;
+    const lines = String(content || "").split("\n").filter(Boolean);
+    const total = lines.length;
+    const summary = lines.slice(0, 4).join("\n") + (total > 4 ? "\n… +" + (total - 4) + " more" : "");
+    toast(title + "\n" + summary);
+    log("recon full output:\n" + content);
   } catch (e) {
-    log("recon modal FAIL", e);
+    log("recon showModal FAIL", e);
   }
-  log("RECON:", title, content);
 }
 
 export function runRecon(): void {

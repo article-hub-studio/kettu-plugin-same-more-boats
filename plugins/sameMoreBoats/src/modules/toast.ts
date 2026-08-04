@@ -67,11 +67,11 @@ export function toast(msg: string) {
   if (!fallbackAlert("Same More Boats", msg)) log("toast dropped:", msg);
 }
 
-/** Deliberately blocking dialog, for cases where the user must read something
- * (e.g. /smb output). Prefer toast() for routine confirmations. */
+/** Non-blocking notification. Prefers the real toast surface; falls back to a
+ * compact alert only when no toast is available on this build. */
 export function showAlert(title: string, content: string) {
   log("alert:", title, "-", content);
-  if (!fallbackAlert(title || "Same More Boats", content || "")) log("alert dropped:", title);
+  toast((title ? title + ": " : "") + (content || ""));
 }
 
 export function notify(msg: string, _kind: "ok" | "fail" = "ok") {
