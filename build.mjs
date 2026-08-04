@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir } from "fs/promises";
+import { readFile, writeFile, readdir, copyFile } from "fs/promises";
 import { extname } from "path";
 import { createHash } from "crypto";
 
@@ -86,4 +86,19 @@ for (let plug of await readdir("./plugins")) {
         console.error("Failed to build plugin...", e);
         process.exit(1);
     }
+}
+
+// Kettu only picks up plugins served as two files at the webroot root
+// (`/index.js` + `/manifest.json`); it does not resolve per-plugin folders.
+// After building, mirror the primary plugin (sameMoreBoats) to `dist/index.js`
+// and `dist/manifest.json` so `dist/` can be hosted as-is and installed via
+// `https://<host>/manifest.json`.
+const PRIMARY = "sameMoreBoats";
+try {
+    await copyFile(`./dist/${PRIMARY}/index.js`, "./dist/index.js");
+    await copyFile(`./dist/${PRIMARY}/manifest.json`, "./dist/manifest.json");
+    console.log(`Staged ${PRIMARY} at dist/index.js + dist/manifest.json (root-level, Kettu-ready)`);
+} catch (e) {
+    console.error("Failed to stage root-level plugin files:", e);
+    process.exit(1);
 }

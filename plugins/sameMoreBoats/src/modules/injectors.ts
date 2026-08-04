@@ -83,7 +83,11 @@ function iconForLabel(id: string, _label: string): number | undefined {
       "smb-copy-created": ["ic_chat_bubble_16px", "ic_calendar", "ic_copy_id"],
       "smb-copy-json": ["ic_message_copy", "ic_copy_id", "CopyIcon"],
       "smb-copy-channel-id": ["ic_members", "ic_copy_id", "CopyIcon"],
+      "smb-copy-channel-link": ["ic_link_24px", "ic_channel", "LinkIcon"],
       "smb-copy-guild-id": ["ic_members", "ic_copy_id", "CopyIcon"],
+      "smb-copy-guild-icon": ["ic_link_24px", "LinkIcon", "ic_image"],
+      "smb-copy-guild-created": ["ic_chat_bubble_16px", "ic_calendar", "ic_copy_id"],
+      "smb-copy-attachment": ["ic_link_24px", "LinkIcon", "ic_image"],
       "smb-jump": ["ic_link_24px", "ic_copy_message_link", "LinkIcon"],
       "smb-header": ["ic_copy_id", "CopyIcon"],
     };
@@ -417,24 +421,38 @@ export function noteLazyKey(key: string) {
 }
 
 // Build our ActionSheetRow elements from the additions list.
+// Each row gets its OWN press handler resolving its action by id, so even if
+// the host menu reuses row instances or clones elements, a tap on a row always
+// runs that row's action — never a shared/neighbouring handler.
 function buildSmbRows(additions: MenuAddition[]): any[] {
   const rows: any[] = [];
-  for (const add of additions) {
-    if (!add?.label) continue;
-    const iconAsset = iconForLabel(add.id, add.label);
-    const rowProps: any = {
-      key: add.id,
-      label: add.label,
-      onPress: () => {
-        try { add.action(); } catch (e) { log("smb row action FAIL", e); }
-        try { ActionSheetModule?.hideActionSheet?.(); } catch {}
-      },
+  try {
+    const byId = new Map<string, MenuAddition>();
+    for (const add of additions) if (add?.id) byId.set(add.id, add);
+
+    const makePress = (id: string) => () => {
+      try {
+        const add = byId.get(id);
+        if (add?.action) add.action();
+        else log("smb row action not found for", id);
+      } catch (e) { log("smb row action FAIL", e); }
+      try { ActionSheetModule?.hideActionSheet?.(); } catch {}
     };
-    if (iconAsset != null && ActionSheetRow?.Icon) {
-      rowProps.icon = React.createElement(ActionSheetRow.Icon, { source: iconAsset });
+
+    for (const add of additions) {
+      if (!add?.label) continue;
+      const iconAsset = iconForLabel(add.id, add.label);
+      const rowProps: any = {
+        key: add.id,
+        label: add.label,
+        onPress: makePress(add.id),
+      };
+      if (iconAsset != null && ActionSheetRow?.Icon) {
+        rowProps.icon = React.createElement(ActionSheetRow.Icon, { source: iconAsset });
+      }
+      rows.push(React.createElement(ActionSheetRow, rowProps));
     }
-    rows.push(React.createElement(ActionSheetRow, rowProps));
-  }
+  } catch (e) { log("buildSmbRows FAIL", e); }
   return rows;
 }
 
@@ -451,7 +469,7 @@ export function injectRowsInto(res: any, ctx: any): boolean {
     rows = findInReactTree(res, (r: any) =>
       Array.isArray(r) && r[0]?.type?.name === "ButtonRow");
   }
-  if (!rows || !Array.isArray(rows)) { log("ctx rows array not found"); return false; }
+  if (!rows || !Array.isArray(rows) || !rows.length) { log("ctx rows array not found"); return false; }
 
   // Guard against duplicate injection on re-renders.
   const already = rows.some((r: any) => {
@@ -463,12 +481,24 @@ export function injectRowsInto(res: any, ctx: any): boolean {
   const smbRows = buildSmbRows(additions);
   if (!smbRows.length) return false;
 
-  // Wrap our rows in an ActionSheetRow.Group so they render as a native section.
-  if (ActionSheetRow.Group) {
-    rows.unshift(React.createElement(ActionSheetRow.Group, { key: "smb-group" }, ...smbRows));
-  } else {
-    rows.unshift(...smbRows);
+  // Prefer cloning the menu's OWN first native row group: our rows then render
+  // through the exact component that renders the native rows, inheriting the
+  // same row model + press handling. Falling back to `ActionSheetRow.Group`
+  // can wrap rows in a group component that isn't the one the menu uses.
+  let group: any = null;
+  try {
+    const first = rows[0];
+    if (React.isValidElement(first)) {
+      group = React.cloneElement(first, { key: "smb-group", children: smbRows });
+    }
+  } catch (e) { log("ctx group clone FAIL", e); }
+  if (!group && ActionSheetRow.Group) {
+    group = React.createElement(ActionSheetRow.Group, { key: "smb-group" }, ...smbRows);
   }
-  captureItemShape(rows[0]);
+
+  if (group) rows.unshift(group);
+  else rows.unshift(...smbRows);
+
+  captureItemShape(smbRows[0] ?? group);
   return true;
 }

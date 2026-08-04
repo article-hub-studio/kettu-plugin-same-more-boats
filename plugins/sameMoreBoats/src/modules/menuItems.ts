@@ -30,11 +30,19 @@ function isSnowflake(v: any): v is string {
   return typeof v === "string" && /^\d{15,25}$/.test(v);
 }
 
-// Find the first key holding a snowflake id on the object (exact-name match
-// only, so we don't accidentally pick a role id as a message id).
-function findIdField(obj: any): string | undefined {
+// Per-entity id keys. Finding a message id must NEVER fall back to a channel
+// or guild id (and vice versa), otherwise "Copy Message ID" silently copies
+// the wrong id when the message object is partial or missing a real snowflake
+// `id` (e.g. temp/optimistic messages).
+const MSG_ID_KEYS = ["id", "messageId", "message_id"];
+const USER_ID_KEYS = ["id", "userId", "user_id"];
+const CHANNEL_ID_KEYS = ["id", "channelId", "channel_id"];
+const GUILD_ID_KEYS = ["id", "guildId", "guild_id"];
+
+// First snowflake among the given exact-name keys (in order).
+function firstSnowflake(obj: any, keys: string[]): string | undefined {
   if (!obj || typeof obj !== "object") return undefined;
-  for (const k of ["id", "messageId", "message_id", "userId", "user_id", "channelId", "channel_id", "guildId", "guild_id"]) {
+  for (const k of keys) {
     if (isSnowflake((obj as any)[k])) return (obj as any)[k];
   }
   return undefined;
@@ -77,18 +85,25 @@ export function buildMenuAdditions(ctx: any): MenuAddition[] {
     const rawChannel = mergedCtx.channel ?? mergedCtx.chan;
     const channel = rawChannel && typeof rawChannel === "object" ? rawChannel : undefined;
 
-    const messageId = (message && (findIdField(message) ?? (isSnowflake(message.id) ? message.id : undefined)))
+    // Each id is resolved with the entity's OWN key set only. The message id
+    // can never leak a channel/guild id, and vice versa — a partial object can
+    // at worst produce "no message" (row hidden), never a wrong-but-working
+    // id on the wrong row.
+    const messageId = (message ? (firstSnowflake(message, MSG_ID_KEYS) ?? (isSnowflake(message.id) ? message.id : undefined)) : undefined)
       ?? (isSnowflake(mergedCtx.messageId) ? mergedCtx.messageId : undefined)
       ?? (isSnowflake(mergedCtx.message_id) ? mergedCtx.message_id : undefined);
-    const userId = user ? user.id : (isSnowflake(mergedCtx.userId) ? mergedCtx.userId : (isSnowflake(mergedCtx.user_id) ? mergedCtx.user_id : undefined));
-    const channelId = (channel && isSnowflake(channel.id) ? channel.id : undefined)
+    const userId = (user ? (firstSnowflake(user, USER_ID_KEYS) ?? (isSnowflake(user.id) ? user.id : undefined)) : undefined)
+      ?? (isSnowflake(mergedCtx.userId) ? mergedCtx.userId : undefined)
+      ?? (isSnowflake(mergedCtx.user_id) ? mergedCtx.user_id : undefined);
+    const channelId = (channel ? firstSnowflake(channel, CHANNEL_ID_KEYS) : undefined)
       ?? (isSnowflake(mergedCtx.channelId) ? mergedCtx.channelId : undefined)
       ?? (isSnowflake(mergedCtx.channel_id) ? mergedCtx.channel_id : undefined)
-      ?? (message && (isSnowflake(message.channel_id) ? message.channel_id : undefined));
-    const guildId = (isSnowflake(mergedCtx.guildId) ? mergedCtx.guildId : undefined)
+      ?? (message ? firstSnowflake(message, ["channel_id", "channelId"]) : undefined);
+    const guildId = (mergedCtx.guild ? firstSnowflake(mergedCtx.guild, GUILD_ID_KEYS) : undefined)
+      ?? (isSnowflake(mergedCtx.guildId) ? mergedCtx.guildId : undefined)
       ?? (isSnowflake(mergedCtx.guild_id) ? mergedCtx.guild_id : undefined)
-      ?? (mergedCtx.guild && isSnowflake(mergedCtx.guild.id) ? mergedCtx.guild.id : undefined)
-      ?? (channel && isSnowflake(channel.guild_id) ? channel.guild_id : undefined);
+      ?? (channel ? firstSnowflake(channel, ["guild_id", "guildId"]) : undefined)
+      ?? (message ? firstSnowflake(message, ["guild_id", "guildId"]) : undefined);
 
     // Guild-shaped object (needed for the server icon URL).
     const guild = mergedCtx.guild && typeof mergedCtx.guild === "object" ? mergedCtx.guild : undefined;

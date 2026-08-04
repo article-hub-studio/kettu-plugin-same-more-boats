@@ -3,30 +3,475 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Same More Boats - Kettu Plugin</title>
+  <title>Same More Boats — Kettu Plugins for Discord Mobile</title>
+  <meta name="description" content="Kettu plugins that bring PC-only Discord features to mobile. Same More Boats (utility) + Liquid Glass (theme).">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; background: #1e1e2e; color: #cdd6f4; }
-    h1 { color: #cba6f7; }
-    a { color: #89b4fa; }
-    code { background: #313244; padding: 2px 6px; border-radius: 4px; }
-    .plugin { background: #313244; padding: 16px; border-radius: 8px; margin: 12px 0; }
+    :root {
+      --bg: #262421;
+      --bg-2: #302E2C;
+      --card: #2f2d2b;
+      --card-hover: #353230;
+      --border: #464340;
+      --border-light: #55524e;
+      --text: #ffffff;
+      --muted: #ababab;
+      --muted-2: #7d7c7a;
+      --accent: #81b64c;
+      --accent-dark: #6f9e3f;
+      --accent-hover: #92c65d;
+      --blue: #7fa650;
+      --danger: #c33;
+      --light-square: #e8e5d8;
+      --dark-square: #abab9f;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Chessboard background decoration */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 50%;
+      width: 1200px;
+      height: 400px;
+      transform: translateX(-50%);
+      background-image:
+        linear-gradient(45deg, transparent 25%, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.06) 75%, transparent 75%),
+        linear-gradient(45deg, transparent 25%, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.06) 75%, transparent 75%);
+      background-size: 80px 80px;
+      background-position: 0 0, 40px 40px;
+      opacity: 0.55;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ---------- Nav ---------- */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(38, 36, 33, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .inner {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.2px;
+    }
+    .brand .boat {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #1a1a1a;
+      font-size: 18px;
+      box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25);
+    }
+    nav .links { display: flex; align-items: center; gap: 20px; }
+    nav .links a { color: var(--muted); text-decoration: none; font-size: 15px; transition: color .15s; }
+    nav .links a:hover { color: var(--text); }
+
+    /* ---------- Hero ---------- */
+    .hero {
+      padding: 96px 0 56px;
+      text-align: center;
+    }
+    .hero .kicker {
+      display: inline-block;
+      background: rgba(129, 182, 76, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(129, 182, 76, 0.4);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    .hero h1 {
+      font-size: clamp(34px, 6vw, 58px);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.5px;
+      margin-bottom: 18px;
+    }
+    .hero h1 .alt { color: var(--accent); }
+    .hero p.tagline {
+      max-width: 640px;
+      margin: 0 auto 32px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+    .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: var(--radius);
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform .12s, box-shadow .12s, background .12s;
+      border: none;
+      font-family: inherit;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary {
+      background: var(--accent);
+      color: #1a1a1a;
+      box-shadow: 0 6px 18px rgba(129, 182, 76, 0.35), inset 0 -3px 0 rgba(0,0,0,0.2);
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    .btn-ghost:hover { border-color: var(--muted); background: var(--bg-2); }
+
+    .hero .flash {
+      margin-top: 18px;
+      font-size: 14px;
+      color: var(--accent);
+      min-height: 20px;
+      font-weight: 600;
+    }
+
+    /* ---------- Section head ---------- */
+    .sec {
+      padding: 40px 0 64px;
+    }
+    .sec .head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+    .sec .head .bar {
+      width: 6px;
+      height: 34px;
+      border-radius: 4px;
+      background: var(--accent);
+    }
+    .sec .head h2 { font-size: 28px; font-weight: 800; letter-spacing: -0.3px; }
+    .sec .head p.sub { color: var(--muted); font-size: 15px; }
+
+    /* ---------- Plugin cards ---------- */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 22px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-color .15s, background .15s, transform .15s;
+    }
+    .card:hover { border-color: var(--border-light); background: var(--card-hover); transform: translateY(-3px); }
+    .card .top { display: flex; align-items: center; justify-content: space-between; }
+    .card .icon {
+      width: 46px; height: 46px; border-radius: 12px;
+      display: grid; place-items: center; font-size: 24px;
+      background: rgba(129, 182, 76, 0.12);
+      border: 1px solid rgba(129, 182, 76, 0.35);
+    }
+    .card .tag {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; padding: 4px 10px; border-radius: 999px;
+      background: rgba(129, 182, 76, 0.15); color: var(--accent);
+      border: 1px solid rgba(129, 182, 76, 0.4);
+    }
+    .card h3 { font-size: 22px; font-weight: 800; }
+    .card p { color: var(--muted); font-size: 15px; flex: 1; }
+    .card .url {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      color: var(--blue);
+      word-break: break-all;
+      user-select: all;
+    }
+    .card .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-sm { padding: 9px 16px; font-size: 14px; border-radius: 8px; }
+    .btn-sm.copy {
+      background: var(--bg-2); color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    .btn-sm.copy:hover { border-color: var(--muted); }
+
+    /* ---------- Install steps ---------- */
+    .steps { counter-reset: step; display: grid; gap: 14px; }
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+    }
+    .step .num {
+      counter-increment: step;
+      flex: 0 0 auto;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #1a1a1a;
+      font-weight: 800;
+      display: grid; place-items: center;
+      box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2);
+    }
+    .step .num::before { content: counter(step); }
+    .step b { display: block; margin-bottom: 2px; }
+    .step p, .step span { color: var(--muted); font-size: 15px; }
+    .step code {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--blue);
+      padding: 1px 8px;
+      border-radius: 6px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+
+    /* ---------- Footer ---------- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 30px 24px;
+      text-align: center;
+      color: var(--muted-2);
+      font-size: 14px;
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 640px) {
+      .hero { padding: 56px 0 36px; }
+      nav .links { display: none; }
+    }
   </style>
 </head>
 <body>
-  <h1>Same More Boats</h1>
-  <p>Kettu plugins for Discord mobile.</p>
+  <nav>
+    <div class="inner">
+      <div class="brand">
+        <span class="boat">⛵</span>
+        <span>Same More Boats</span>
+      </div>
+      <div class="links">
+        <a href="#plugins">Plugins</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/article-hub-studio/kettu-plugin-same-more-boats" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </nav>
 
-  <div class="plugin">
-    <strong>sameMoreBoats</strong> — PC feature parity for Discord mobile
-    <br><code>https://article-hub-studio.github.io/kettu-plugin-same-more-boats/sameMoreBoats</code>
-  </div>
+  <main class="wrap">
+    <!-- Hero -->
+    <section class="hero">
+      <span class="kicker">Kettu · Discord Mobile</span>
+      <h1>Bring the <span class="alt">PC experience</span> to your phone.</h1>
+      <p class="tagline">
+        Same More Boats ports desktop-only Discord features to mobile — expanded
+        context menus, author/role tags, forced Developer Mode and more.
+        Pair it with Liquid Glass for a clean translucent look.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#plugins">Browse Plugins</a>
+        <a class="btn btn-ghost" href="#install">Install Guide</a>
+      </div>
+      <div class="flash" id="flash"></div>
+    </section>
 
-  <div class="plugin">
-    <strong>liquid-glass</strong> — Theme
-    <br><code>https://article-hub-studio.github.io/kettu-plugin-same-more-boats/liquid-glass</code>
-  </div>
+    <!-- Plugins -->
+    <section class="sec" id="plugins">
+      <div class="head">
+        <span class="bar"></span>
+        <div>
+          <h2>Plugins</h2>
+          <p class="sub">Add a plugin in Kettu by pasting its URL. Both files are served straight from this site.</p>
+        </div>
+      </div>
 
-  <hr>
-  <p><a href="https://github.com/article-hub-studio/kettu-plugin-same-more-boats">View on GitHub</a></p>
+      <div class="cards">
+        <div class="card">
+          <div class="top">
+            <span class="icon">⚙️</span>
+            <span class="tag">Utility</span>
+          </div>
+          <h3>Same More Boats</h3>
+          <p>
+            PC feature parity for Discord mobile: expanded context menus
+            (Copy ID, Message/Channel Link, Avatar &amp; Server Icon URL, Message JSON,
+            Attachment URLs, account &amp; server created dates), BOT/role author tags,
+            forced Developer Mode, forum support and Flux/DevTools inspection.
+          </p>
+          <div class="url" id="url-smb">https://article-hub-studio.github.io/kettu-plugin-same-more-boats/manifest.json</div>
+          <div class="actions">
+            <button class="btn btn-sm copy" data-copy="url-smb">Copy URL</button>
+            <a class="btn btn-sm btn-primary" href="#install">How to install</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="top">
+            <span class="icon">💧</span>
+            <span class="tag">Theme</span>
+          </div>
+          <h3>Liquid Glass</h3>
+          <p>
+            A balanced translucent makeover for Discord on Kettu. Rounds and layers the
+            chat composer, channel rows, section cards and compact buttons while keeping
+            every line of text readable.
+          </p>
+          <div class="url" id="url-lg">https://article-hub-studio.github.io/kettu-plugin-same-more-boats/liquid-glass</div>
+          <div class="actions">
+            <button class="btn btn-sm copy" data-copy="url-lg">Copy URL</button>
+            <a class="btn btn-sm btn-primary" href="#install">How to install</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section class="sec" id="install">
+      <div class="head">
+        <span class="bar"></span>
+        <div>
+          <h2>Install in Kettu</h2>
+          <p class="sub">Takes about a minute.</p>
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <span class="num"></span>
+          <div>
+            <b>Open Kettu &amp; go to Plugins</b>
+            <span>Open the Kettu settings and open the <b>Plugins</b> tab.</span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="num"></span>
+          <div>
+            <b>Paste the plugin URL</b>
+            <span>
+              Use the copy buttons above, then paste either
+              <code>https://article-hub-studio.github.io/kettu-plugin-same-more-boats/manifest.json</code>
+              (Same More Boats) or the Liquid Glass URL into the add-plugin box.
+            </span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="num"></span>
+          <div>
+            <b>Enable &amp; reload</b>
+            <span>
+              Kettu fetches the manifest, loads <code>index.js</code> from the same host and activates the plugin.
+              Toggle features from the plugin settings once it loads.
+            </span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="num"></span>
+          <div>
+            <b>Debug from chat</b>
+            <span>
+              Same More Boats registers a slash command:
+              <code>/smb status</code>, <code>/smb scan</code>, <code>/smb shape</code>,
+              <code>/smb keys</code>, <code>/smb reset</code>.
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="https://github.com/article-hub-studio/kettu-plugin-same-more-boats" target="_blank" rel="noopener">View on GitHub</a>
+      &nbsp;·&nbsp; Built for <a href="https://github.com/revenge-mod" target="_blank" rel="noopener">Kettu</a>
+    </p>
+  </footer>
+
+  <script>
+    document.querySelectorAll(".btn.copy").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-copy");
+        var text = (document.getElementById(id) || {}).textContent || "";
+        function done(ok) {
+          var flash = document.getElementById("flash");
+          if (flash) {
+            flash.textContent = ok ? "URL copied to clipboard ✓" : "Copy failed — copy the link manually.";
+            setTimeout(function () { flash.textContent = ""; }, 2500);
+          }
+        }
+        var copied = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { copied = true; done(true); })
+            .catch(function () { done(false); });
+        } else {
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          try { copied = document.execCommand("copy"); } catch (e) {}
+          document.body.removeChild(ta);
+          done(copied);
+        }
+        if (copied) done(true);
+      });
+    });
+  </script>
 </body>
 </html>
